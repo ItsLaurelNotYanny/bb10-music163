@@ -1,0 +1,29 @@
+[package]
+name = "gateway"
+version.workspace = true
+edition.workspace = true
+license = "GPL-3.0-only"
+description = "BB10 Music163 modular monolith gateway service and M1 CLI."
+
+[dependencies]
+anyhow.workspace = true
+axum = "0.8"
+bytes = "1"
+clap = { version = "4.5", features = ["derive", "env"] }
+futures-lite = "2"
+http = "1"
+media-relay = { path = "../media-relay" }
+netease-adapter = { path = "../netease-adapter" }
+playback-session = { path = "../playback-session" }
+provider-model = { path = "../provider-model" }
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+toml = "0.8"
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+[dev-dependencies]
+http-body-util = "0.1"
+tempfile = "3"
+tower = { version = "0.5", features = ["util"] }

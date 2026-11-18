@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<qnx xmlns="http://www.qnx.com/schemas/application/1.0">
+    <id>com.bb10music163.shell</id>
+    <name>网易云音乐</name>
+    <versionNumber>1.0.0</versionNumber>
+    <buildId>5</buildId>
+    <description>Fullscreen Cascades WebView shell for bb10-music163 gateway</description>
+    <author>BB10 Music163</author>
+    <icon>
+        <image>assets/icon.png</image>
+    </icon>
+    <initialWindow>
+        <autoOrients>true</autoOrients>
+        <systemChrome>none</systemChrome>
+    </initialWindow>
+    <configuration name="Device-Debug">
+        <platformArchitecture>armle-v7</platformArchitecture>
+        <asset path="build/bb10/bin/bb10-music163" entry="true" type="Qnx/Elf">bb10-music163</asset>
+    </configuration>
+    <asset path="assets">assets</asset>
+    <permission system="true">run_native</permission>
+    <permission>access_internet</permission>
+    <env var="LD_LIBRARY_PATH" value="/usr/lib/qt4/lib:/usr/lib"/>
+</qnx>

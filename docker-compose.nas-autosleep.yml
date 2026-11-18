@@ -1,0 +1,59 @@
+# Optional NAS Auto-Sleep (Scale-to-Zero) + HTTPS TLS termination overlay.
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.nas-autosleep.yml up -d
+#
+# Traefik owns the external HTTPS port (:16380 -> :443), terminates TLS using your
+# internal Root CA server certificate (/certs/server.crt + /certs/server.key),
+# and delegates idle container stop/start to Sablier.
+# Compatible with OCI VPS tcp-relay@music163 (TLS_GUARD=1).
+
+services:
+  bb10-music163-gateway:
+    restart: "no"
+    ports: !reset []
+    labels:
+      - "sablier.enable=true"
+      - "sablier.group=bb10-music163"
+      - "traefik.enable=true"
+      - "traefik.http.routers.gateway.rule=PathPrefix(`/`)"
+      - "traefik.http.routers.gateway.entrypoints=websecure"
+      - "traefik.http.routers.gateway.tls=true"
+      - "traefik.http.routers.gateway.middlewares=gateway-sablier@docker"
+      - "traefik.http.services.gateway.loadbalancer.server.port=8090"
+      - "traefik.http.middlewares.gateway-sablier.plugin.sablier.sablierUrl=http://sablier:10000"
+      - "traefik.http.middlewares.gateway-sablier.plugin.sablier.group=bb10-music163"
+      - "traefik.http.middlewares.gateway-sablier.plugin.sablier.sessionDuration=${IDLE_SLEEP_DURATION:-10m}"
+      - "traefik.http.middlewares.gateway-sablier.plugin.sablier.blocking.timeout=30s"
+
+  sablier:
+    image: sablierapp/sablier:1.8.6
+    container_name: bb10-music163-sablier
+    restart: unless-stopped
+    command:
+      - start
+      - --provider.name=docker
+      - --strategy.blocking.default-timeout=30s
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+  traefik:
+    image: traefik:v3.3
+    container_name: bb10-music163-traefik
+    restart: unless-stopped
+    depends_on:
+      - sablier
+    ports:
+      - "${GATEWAY_HOST_PORT:-16380}:443"
+      - "${GATEWAY_LAN_HTTP_PORT:-16381}:80"
+    command:
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.file.filename=/etc/traefik/dynamic/tls.yml"
+      - "--experimental.plugins.sablier.modulename=github.com/sablierapp/sablier"
+      - "--experimental.plugins.sablier.version=v1.8.6"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./config/traefik-tls.yml:/etc/traefik/dynamic/tls.yml:ro
+      - ${CERTS_DIR:-./certs}:/certs:ro

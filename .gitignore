@@ -1,0 +1,12 @@
+/target/
+/state/
+/config/gateway.toml
+/fixtures/audio/*.mp3
+*.local.toml
+.env
+__pycache__/
+*.pyc
+.DS_Store
+/bb10-shell/build/
+/bb10-shell/third_party/
+.vscode/

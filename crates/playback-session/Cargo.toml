@@ -1,0 +1,11 @@
+[package]
+name = "playback-session"
+version.workspace = true
+edition.workspace = true
+license = "MIT OR Apache-2.0"
+description = "Provider-independent playback ownership arbitration, monotonic generations, queue references, and command validation."
+
+[dependencies]
+provider-model = { path = "../provider-model" }
+serde.workspace = true
+thiserror.workspace = true

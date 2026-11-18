@@ -1,0 +1,3124 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=2.0, viewport-fit=cover, user-scalable=yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>NetEase Gateway Player</title>
+  <style>
+    :root {
+      --red: #d33a31;
+      --red-dark: #b7271f;
+      --bg: #f5f6f8;
+      --surface: #ffffff;
+      --text: #222222;
+      --muted: #767676;
+      --border: #e7e8eb;
+      --active-bg: #fff3f2;
+      --target-size: 36px;
+      --bottom-bar-h: 78px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    [hidden] { display: none !important; }
+    html {
+      scroll-padding-bottom: 78px;
+      scroll-padding-bottom: calc(var(--bottom-bar-h) + env(safe-area-inset-bottom, 0px));
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: #f5f6f8;
+      background: var(--bg);
+      color: #222222;
+      color: var(--text);
+      line-height: 1.4;
+      font-size: 14px;
+      overflow-wrap: break-word;
+      padding-bottom: 94px;
+      padding-bottom: calc(var(--bottom-bar-h) + 16px + env(safe-area-inset-bottom, 0px));
+    }
+    img { max-width: 100%; height: auto; }
+    button {
+      font-family: inherit;
+      cursor: pointer;
+      border: 1px solid #e7e8eb;
+      border: 1px solid var(--border);
+      background: #ffffff;
+      background: var(--surface);
+      color: #222222;
+      color: var(--text);
+      border-radius: 6px;
+      font-size: 13px;
+      padding: 6px 10px;
+      min-height: 36px;
+      min-height: var(--target-size);
+      min-width: 36px;
+      min-width: var(--target-size);
+      vertical-align: middle;
+    }
+    button:active { opacity: 0.78; }
+    button:disabled { opacity: 0.4; cursor: default; }
+    button.btn-primary {
+      background: #d33a31;
+      background: var(--red);
+      border-color: #d33a31;
+      border-color: var(--red);
+      color: #ffffff;
+      font-weight: bold;
+    }
+    button.btn-outline-red {
+      background: #ffffff;
+      border-color: #d33a31;
+      border-color: var(--red);
+      color: #d33a31;
+      color: var(--red);
+      font-weight: bold;
+    }
+    button.btn-ghost {
+      background: transparent;
+      border-color: transparent;
+      color: #ffffff;
+    }
+    button.btn-sm {
+      min-height: 32px;
+      min-width: 32px;
+      padding: 4px 9px;
+      font-size: 12px;
+    }
+    input[type=text], input[type=password], select {
+      font-family: inherit;
+      font-size: 13px;
+      color: #222222;
+      color: var(--text);
+      background: #ffffff;
+      border: 1px solid #d0d3d9;
+      border-radius: 6px;
+      padding: 7px 10px;
+      min-height: 36px;
+      min-height: var(--target-size);
+    }
+    .app-shell {
+      max-width: 860px;
+      margin: 0 auto;
+    }
+
+    /* Top NetEase Red Navigation Bar */
+    .top-header {
+      background: #d33a31;
+      background: var(--red);
+      color: #ffffff;
+      padding: 6px 10px;
+      padding-top: max(6px, env(safe-area-inset-top, 0px));
+      display: -webkit-box;
+      display: -webkit-flex;
+      display: flex;
+      -webkit-box-align: center;
+      -webkit-align-items: center;
+      align-items: center;
+      -webkit-box-pack: justify;
+      -webkit-justify-content: space-between;
+      justify-content: space-between;
+    }
+    .top-center {
+      -webkit-box-flex: 1;
+      -webkit-flex: 1;
+      flex: 1;
+      min-width: 0;
+      text-align: center;
+      padding: 0 6px;
+    }
+    .top-title {
+      font-size: 15px;
+      font-weight: bold;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .top-sub {
+      font-size: 11px;
+      opacity: 0.92;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .badge {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 10px;
+      font-size: 10px;
+      font-weight: bold;
+      font-family: monospace;
+      background: rgba(0, 0, 0, 0.25);
+      color: #ffffff;
+      margin-left: 4px;
+    }
+    .badge-owner { background: #2e7d32; }
+    .badge-stopped { background: #555555; }
+    .badge-other { background: #ef6c00; }
+
+    /* White Sub-Nav Tabs matching screenshot & MWG tabs rule */
+    .tab-bar {
+      background: #ffffff;
+      background: var(--surface);
+      border-bottom: 1px solid #e7e8eb;
+      border-bottom: 1px solid var(--border);
+      display: -webkit-box;
+      display: -webkit-flex;
+      display: flex;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    [role="tab"] {
+      -webkit-box-flex: 1;
+      -webkit-flex: 1 0 auto;
+      flex: 1 0 auto;
+      background: transparent;
+      border: none;
+      border-radius: 0;
+      color: #444444;
+      font-size: 14px;
+      font-weight: 500;
+      padding: 10px 12px;
+      min-height: 44px;
+      position: relative;
+      text-align: center;
+      white-space: nowrap;
+    }
+    [role="tab"][aria-selected="true"] {
+      color: #d33a31;
+      color: var(--red);
+    }
+    [role="tab"][aria-selected="true"]::after {
+      content: "";
+      position: absolute;
+      left: 16%;
+      right: 16%;
+      bottom: 0;
+      border-bottom: 3px solid #d33a31;
+      border-bottom: 3px solid var(--red);
+    }
+
+    .panel-inner {
+      padding: 10px;
+    }
+
+    /* Settings & QR Drawer */
+    .drawer-card {
+      background: #ffffff;
+      background: var(--surface);
+      border-bottom: 1px solid #e7e8eb;
+      border-bottom: 1px solid var(--border);
+      padding: 10px 12px;
+    }
+    .form-row {
+      display: -webkit-box;
+      display: -webkit-flex;
+      display: flex;
+      -webkit-box-align: center;
+      -webkit-align-items: center;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .form-row label.lbl {
+      width: 78px;
+      font-size: 12px;
+      color: #767676;
+      color: var(--muted);
+      font-weight: bold;
+      -webkit-flex-shrink: 0;
+      flex-shrink: 0;
+    }
+    .form-row input {
+      -webkit-box-flex: 1;
+      -webkit-flex: 1;
+      flex: 1;
+      min-width: 100px;
+      margin-right: 6px;
+    }
+    .form-row input:last-child { margin-right: 0; }
+    .qr-box {
+      background: #ffffff;
+      border: 1px solid #e7e8eb;
+      border: 1px solid var(--border);
+      padding: 8px;
+      display: inline-block;
+      border-radius: 6px;
+      margin-top: 6px;
+    }
+
+    /* Quick Action Circles (matching screenshot: 心动模式 / 每日推荐 / 私人FM) */
+    .quick-circles {
+      background: #ffffff;
+      background: var(--surface);
+      border-radius: 8px;
+      border: 1px solid #e7e8eb;
+      border: 1px solid var(--border);
+      padding: 12px 8px;
+      margin-bottom: 10px;
+      display: -webkit-box;
+      display: -webkit-flex;
+      display: flex;
+      -webkit-box-pack: justify;
+      -webkit-justify-content: space-around;
+      justify-content: space-around;
+      text-align: center;
+    }
+    .circle-action {
+      -webkit-box-flex: 1;
+      -webkit-flex: 1;
+      flex: 1;
+      background: transparent;
+      border: none;
+      padding: 4px 6px;
+      min-width: 84px;
+      color: #222222;
+      color: var(--text);
+      text-align: center;
+    }
+    .circle-ring {
+      display: block;
+      width: 52px;
+      height: 52px;
+      line-height: 49px;
+      border-radius: 50%;
+      border: 1.5px solid #d33a31;
+      border: 1.5px solid var(--red);
+      margin: 0 auto 6px auto;
+      text-align: center;
+      color: #d33a31;
+      color: var(--red);
+      position: relative;
+      background: #ffffff;
+    }
+    .circle-ring svg {
+      vertical-align: middle;
+    }
+    .circle-action.active .circle-ring {
+      background: #fff3f2;
+      background: var(--active-bg);
+      box-shadow: 0 0 0 2px rgba(211, 58, 49, 0.16);
+    }
+    .circle-day {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 23px;
+      line-height: 1;
+      text-align: center;
+      font-size: 10px;
+      font-weight: bold;
+      color: #d33a31;
+      color: var(--red);
+    }
+    .circle-label {
+      display: block;
+      font-size: 12px;
+      color: #333333;
+      font-weight: 500;
+    }
+
+    /* Section Card & Track List */
+    .section-card {
+      background: #ffffff;
+      background: var(--surface);
+      border-radius: 8px;
+      border: 1px solid #e7e8eb;
+      border: 1px solid var(--border);
+      padding: 10px;
+      margin-bottom: 10px;
+    }
+    .section-head {
+      display: -webkit-box;
+      display: -webkit-flex;
+      display: flex;
+      -webkit-box-pack: justify;
+      -webkit-justify-content: space-between;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -webkit-align-items: center;
+      align-items: center;
+      -webkit-flex-wrap: wrap;
+      flex-wrap: wrap;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #e7e8eb;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 8px;
+    }
+    .section-title {
+      font-size: 14px;
+      font-weight: bold;
+      color: #222222;
+      color: var(--text);
+      border-left: 3px solid #d33a31;
+      border-left: 3px solid var(--red);
+      padding-left: 7px;
+      margin-right: 8px;
+    }
+    .btn-row button {
+      margin-left: 5px;
+      margin-top: 2px;
+      margin-bottom: 2px;
+    }
+    .pill-bar {
+      margin: 6px 0;
+    }
+    .pill-btn {
+      background: #f3f4f6;
+      border: 1px solid #e1e3e8;
+      color: #444444;
+      font-size: 12px;
+      min-height: 32px;
+      padding: 4px 10px;
+      border-radius: 16px;
+      margin-right: 6px;
+      margin-bottom: 6px;
+    }
+    .pill-btn.active {
+      background: #fff3f2;
+      background: var(--active-bg);
+      border-color: #d33a31;
+      border-color: var(--red);
+      color: #d33a31;
+      color: var(--red);
+      font-weight: bold;
+    }
+
+    .track-list {
+      list-style: none;
+    }
+    .track-row {
+      display: -webkit-box;
+      display: -webkit-flex;
+      display: flex;
+      -webkit-box-align: center;
+      -webkit-align-items: center;
+      align-items: center;
+      padding: 8px 4px;
+      border-bottom: 1px solid #f0f1f4;
+    }
+    .track-row.active {
+      background: #fff3f2;
+      background: var(--active-bg);
+      border-radius: 6px;
+    }
+    .track-num {
+      width: 28px;
+      text-align: center;
+      font-size: 12px;
+      color: #767676;
+      color: var(--muted);
+      -webkit-flex-shrink: 0;
+      flex-shrink: 0;
+    }
+    .track-row.active .track-num {
+      color: #d33a31;
+      color: var(--red);
+      font-weight: bold;
+    }
+    .track-cover {
+      width: 40px;
+      height: 40px;
+      border-radius: 4px;
+      object-fit: cover;
+      background: #eceef2;
+      margin-right: 9px;
+      -webkit-flex-shrink: 0;
+      flex-shrink: 0;
+    }
+    .track-meta {
+      -webkit-box-flex: 1;
+      -webkit-flex: 1;
+      flex: 1;
+      min-width: 0;
+      margin-right: 6px;
+    }
+    .track-name {
+      font-size: 14px;
+      font-weight: 500;
+      color: #222222;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .track-row.active .track-name {
+      color: #d33a31;
+      color: var(--red);
+      font-weight: bold;
+    }
+    .track-sub {
+      font-size: 11px;
+      color: #767676;
+      color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-top: 2px;
+    }
+    .track-actions {
+      white-space: nowrap;
+      -webkit-flex-shrink: 0;
+      flex-shrink: 0;
+    }
+    .btn-heart {
+      background: transparent;
+      border: none;
+      font-size: 17px;
+      color: #9e9e9e;
+      padding: 4px 6px;
+      min-width: 34px;
+      min-height: 34px;
+    }
+    .btn-heart.liked {
+      color: #d33a31;
+      color: var(--red);
+    }
+    .pager {
+      display: -webkit-box;
+      display: -webkit-flex;
+      display: flex;
+      -webkit-box-pack: justify;
+      -webkit-justify-content: space-between;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -webkit-align-items: center;
+      align-items: center;
+      background: #fafafa;
+      border: 1px solid #e7e8eb;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 5px 8px;
+      margin: 6px 0;
+      font-size: 12px;
+      color: #767676;
+      color: var(--muted);
+    }
+    .status-note {
+      padding: 10px;
+      background: #fafafa;
+      border: 1px dashed #d5d7dc;
+      border-radius: 6px;
+      font-size: 12px;
+      color: #767676;
+      color: var(--muted);
+      text-align: center;
+      margin: 6px 0;
+    }
+
+    /* Log Details (content-first noise reduction) */
+    details.log-details {
+      background: #ffffff;
+      background: var(--surface);
+      border: 1px solid #e7e8eb;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      margin-top: 8px;
+    }
+    details.log-details summary {
+      font-size: 13px;
+      font-weight: bold;
+      color: #767676;
+      color: var(--muted);
+      cursor: pointer;
+    }
+    .log-box {
+      background: #141619;
+      color: #a5d6a7;
+      font-family: monospace;
+      font-size: 11px;
+      height: 110px;
+      overflow-y: scroll;
+      padding: 6px;
+      border-radius: 4px;
+      margin-top: 8px;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    /* Fixed Bottom Mini-Player Bar (<= 82px / < 12% viewport height) */
+    .bottom-player {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 50;
+      background: #ffffff;
+      background: rgba(255, 255, 255, 0.97);
+      border-top: 1px solid #dddddd;
+      box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.06);
+      padding-bottom: 3px;
+      padding-bottom: max(3px, env(safe-area-inset-bottom, 0px));
+    }
+    .bottom-inner {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 2px 10px 2px 10px;
+    }
+    .seek-strip {
+      display: -webkit-box;
+      display: -webkit-flex;
+      display: flex;
+      -webkit-box-align: center;
+      -webkit-align-items: center;
+      align-items: center;
+      margin-bottom: 2px;
+    }
+    .seek-strip input[type=range] {
+      -webkit-box-flex: 1;
+      -webkit-flex: 1;
+      flex: 1;
+      height: 18px;
+      margin: 0 8px 0 0;
+    }
+    .seek-time {
+      font-family: monospace;
+      font-size: 11px;
+      color: #767676;
+      color: var(--muted);
+      white-space: nowrap;
+      margin-right: 6px;
+    }
+    .quality-mini {
+      min-height: 24px;
+      height: 24px;
+      font-size: 11px;
+      padding: 1px 4px;
+      border-color: #e7e8eb;
+      border-color: var(--border);
+    }
+    .mini-row {
+      display: -webkit-box;
+      display: -webkit-flex;
+      display: flex;
+      -webkit-box-align: center;
+      -webkit-align-items: center;
+      align-items: center;
+      padding-left: 0;
+      padding-left: max(0px, env(safe-area-inset-left, 0px));
+      padding-right: 0;
+      padding-right: max(0px, env(safe-area-inset-right, 0px));
+    }
+    .mini-open-trigger {
+      display: -webkit-box;
+      display: -webkit-flex;
+      display: flex;
+      -webkit-box-align: center;
+      -webkit-align-items: center;
+      align-items: center;
+      -webkit-box-flex: 1;
+      -webkit-flex: 1;
+      flex: 1;
+      min-width: 0;
+      min-height: 44px;
+      background: transparent;
+      border: none;
+      border-radius: 6px;
+      padding: 2px 4px 2px 0;
+      margin-right: 4px;
+      text-align: left;
+    }
+    .mini-cover {
+      width: 42px;
+      height: 42px;
+      border-radius: 6px;
+      object-fit: cover;
+      background: #eceef2;
+      margin-right: 9px;
+      -webkit-flex-shrink: 0;
+      flex-shrink: 0;
+    }
+    .mini-info {
+      display: block;
+      -webkit-box-flex: 1;
+      -webkit-flex: 1;
+      flex: 1;
+      min-width: 0;
+    }
+    .mini-title {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #222222;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .mini-artist {
+      display: block;
+      font-size: 11px;
+      color: #767676;
+      color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .mini-controls {
+      white-space: nowrap;
+      -webkit-flex-shrink: 0;
+      flex-shrink: 0;
+    }
+    .btn-circle-play {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      border: 1.5px solid #444444;
+      background: #ffffff;
+      color: #222222;
+      font-size: 15px;
+      font-weight: bold;
+      padding: 0;
+      margin: 0 3px;
+    }
+    .btn-circle-play.playing {
+      border-color: #d33a31;
+      border-color: var(--red);
+      color: #d33a31;
+      color: var(--red);
+    }
+    .btn-ctrl {
+      border: none;
+      background: transparent;
+      color: #444444;
+      font-size: 14px;
+      padding: 4px 6px;
+      min-width: 32px;
+      min-height: 36px;
+    }
+
+    /* Full-Screen Now Playing Vinyl Turntable Dialog (Square-Screen & Portrait Friendly) */
+    dialog.np-dialog {
+      position: fixed;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      max-width: 100%;
+      max-height: 100%;
+      margin: 0;
+      padding: 0;
+      border: none;
+      background: #241f22;
+      background: linear-gradient(180deg, #322a2e 0%, #1c181a 56%, #131113 100%);
+      color: #ffffff;
+      z-index: 200;
+      overflow-y: auto;
+    }
+    dialog.np-dialog:not([open]) {
+      display: none;
+    }
+    dialog.np-dialog[open] {
+      display: -webkit-box;
+      display: -webkit-flex;
+      display: flex;
+      -webkit-box-orient: vertical;
+      -webkit-box-direction: normal;
+      -webkit-flex-direction: column;
+      flex-direction: column;
+    }
+    dialog:modal {
+      overscroll-behavior: contain;
+    }
+    dialog::backdrop {
+      overflow: hidden;
+      overscroll-behavior: contain;
+      background: #181517;
+    }
+    .np-shell {
+      width: 100%;
+      max-width: 720px;
+      height: 100%;
+      margin: 0 auto;
+      padding: 8px 16px 12px 16px;
+      padding-top: max(8px, env(safe-area-inset-top, 0px));
+      padding-bottom: max(12px, env(safe-area-inset-bottom, 0px));
+      display: -webkit-box;
+      display: -webkit-flex;
+      display: flex;
+      -webkit-box-orient: vertical;
+      -webkit-box-direction: normal;
+      -webkit-flex-direction: column;
+      flex-direction: column;
+      -webkit-box-pack: justify;
+      -webkit-justify-content: space-between;
+      justify-content: space-between;
+    }
+    .np-header {
+      display: -webkit-box;
+      display: -webkit-flex;
+      display: flex;
+      -webkit-box-align: center;
+      -webkit-align-items: center;
+      align-items: center;
+      -webkit-box-pack: justify;
+      -webkit-justify-content: space-between;
+      justify-content: space-between;
+      -webkit-flex-shrink: 0;
+      flex-shrink: 0;
+      min-height: 44px;
+    }
+    .np-icon-btn {
+      background: transparent;
+      border: none;
+      color: #f3f1f2;
+      min-width: 44px;
+      min-height: 44px;
+      padding: 8px;
+      border-radius: 50%;
+    }
+    .np-pill-btn {
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.24);
+      color: #f5f2f3;
+      border-radius: 16px;
+      font-size: 12px;
+      padding: 4px 12px;
+      min-height: 34px;
+    }
+    .np-header-center {
+      -webkit-box-flex: 1;
+      -webkit-flex: 1;
+      flex: 1;
+      min-width: 0;
+      text-align: center;
+      padding: 0 8px;
+    }
+    .np-context-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #f7f4f5;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .np-sub-status {
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.6);
+      font-family: monospace;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .np-stage {
+      -webkit-box-flex: 1;
+      -webkit-flex: 1;
+      flex: 1;
+      min-height: 260px;
+      display: -webkit-box;
+      display: -webkit-flex;
+      display: flex;
+      -webkit-box-align: center;
+      -webkit-align-items: center;
+      align-items: center;
+      -webkit-box-pack: center;
+      -webkit-justify-content: center;
+      justify-content: center;
+      overflow: hidden;
+      padding: 4px 0;
+    }
+    .turntable-box {
+      position: relative;
+      width: 280px;
+      height: 298px;
+      margin: 0 auto;
+      -webkit-flex-shrink: 0;
+      flex-shrink: 0;
+    }
+    .tonearm-wrap {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      margin-left: -16px;
+      width: 128px;
+      height: 130px;
+      z-index: 6;
+      pointer-events: none;
+      -webkit-transform-origin: 16px 16px;
+      transform-origin: 16px 16px;
+      -webkit-transform: rotate(-24deg);
+      transform: rotate(-24deg);
+      -webkit-transition: -webkit-transform 0.4s ease;
+      transition: transform 0.4s ease;
+    }
+    .turntable-box.playing .tonearm-wrap {
+      -webkit-transform: rotate(0deg);
+      transform: rotate(0deg);
+    }
+    .vinyl-outer {
+      position: absolute;
+      top: 44px;
+      left: 50%;
+      margin-left: -122px;
+      width: 244px;
+      height: 244px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+      padding: 9px;
+    }
+    .vinyl-disc {
+      position: relative;
+      width: 224px;
+      height: 224px;
+      border-radius: 50%;
+      background-color: #141416;
+      background-image: repeating-radial-gradient(
+        circle at 50% 50%,
+        #18181b 0px,
+        #18181b 2px,
+        #0c0c0e 3px,
+        #18181b 5px
+      );
+      border: 2px solid #09090a;
+      box-shadow: inset 0 0 14px rgba(255, 255, 255, 0.07);
+      -webkit-animation: vinyl-spin 22s linear infinite;
+      animation: vinyl-spin 22s linear infinite;
+      -webkit-animation-play-state: paused;
+      animation-play-state: paused;
+    }
+    .turntable-box.playing .vinyl-disc {
+      -webkit-animation-play-state: running;
+      animation-play-state: running;
+    }
+    .vinyl-disc::before {
+      content: "";
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      bottom: 14px;
+      left: 14px;
+      border-radius: 50%;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      pointer-events: none;
+    }
+    .vinyl-disc::after {
+      content: "";
+      position: absolute;
+      top: 28px;
+      right: 28px;
+      bottom: 28px;
+      left: 28px;
+      border-radius: 50%;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      pointer-events: none;
+    }
+    .vinyl-cover {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 146px;
+      height: 146px;
+      margin-top: -73px;
+      margin-left: -73px;
+      border-radius: 50%;
+      object-fit: cover;
+      background: #222226;
+      border: 3px solid #0b0b0c;
+    }
+    @-webkit-keyframes vinyl-spin {
+      from { -webkit-transform: rotate(0deg); }
+      to { -webkit-transform: rotate(360deg); }
+    }
+    @keyframes vinyl-spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    .np-footer {
+      -webkit-flex-shrink: 0;
+      flex-shrink: 0;
+      padding-top: 4px;
+    }
+    .np-meta-row {
+      display: -webkit-box;
+      display: -webkit-flex;
+      display: flex;
+      -webkit-box-align: center;
+      -webkit-align-items: center;
+      align-items: center;
+      -webkit-box-pack: justify;
+      -webkit-justify-content: space-between;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .np-meta-text {
+      -webkit-box-flex: 1;
+      -webkit-flex: 1;
+      flex: 1;
+      min-width: 0;
+      margin-right: 10px;
+    }
+    .np-title {
+      font-size: 18px;
+      font-weight: bold;
+      color: #ffffff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .np-artist {
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.68);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-top: 2px;
+    }
+    .np-heart-btn {
+      background: transparent;
+      border: none;
+      color: rgba(255, 255, 255, 0.72);
+      font-size: 24px;
+      min-width: 44px;
+      min-height: 44px;
+      padding: 4px;
+    }
+    .np-heart-btn.liked {
+      color: #e94c42;
+    }
+    .np-progress-area {
+      margin-bottom: 8px;
+    }
+    .np-seek-wrap {
+      position: relative;
+      width: 100%;
+      height: 28px;
+    }
+    .np-seek-track {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 50%;
+      height: 3px;
+      margin-top: -1.5px;
+      border-radius: 2px;
+      background: rgba(255, 255, 255, 0.20);
+      pointer-events: none;
+    }
+    .np-seek-fill {
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 0%;
+      border-radius: 2px;
+      background: rgba(255, 255, 255, 0.72);
+    }
+    .np-seek-thumb {
+      position: absolute;
+      top: 50%;
+      left: 0%;
+      width: 6px;
+      height: 6px;
+      margin-top: -3px;
+      margin-left: -3px;
+      border-radius: 50%;
+      background: #ffffff;
+      box-shadow: 0 0 3px rgba(0, 0, 0, 0.4);
+      pointer-events: none;
+    }
+    .np-seek-input {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 28px;
+      margin: 0;
+      padding: 0;
+      opacity: 0;
+      cursor: pointer;
+      z-index: 2;
+    }
+    .np-time-row {
+      display: -webkit-box;
+      display: -webkit-flex;
+      display: flex;
+      -webkit-box-align: center;
+      -webkit-align-items: center;
+      align-items: center;
+      -webkit-box-pack: justify;
+      -webkit-justify-content: space-between;
+      justify-content: space-between;
+      margin-top: 2px;
+    }
+    .np-time {
+      font-family: monospace;
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.56);
+    }
+    .np-quality-wrap {
+      position: relative;
+      display: inline-block;
+    }
+    .np-quality-btn {
+      background: transparent;
+      border: none;
+      color: rgba(255, 255, 255, 0.68);
+      font-size: 12px;
+      min-height: 28px;
+      height: 28px;
+      min-width: 72px;
+      padding: 2px 10px;
+      border-radius: 6px;
+    }
+    .np-quality-menu {
+      position: absolute;
+      bottom: 32px;
+      left: 50%;
+      margin-left: -68px;
+      width: 136px;
+      background: #272225;
+      background: rgba(39, 34, 37, 0.98);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 8px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+      padding: 4px;
+      z-index: 20;
+    }
+    .np-quality-item {
+      display: -webkit-box;
+      display: -webkit-flex;
+      display: flex;
+      -webkit-box-align: center;
+      -webkit-align-items: center;
+      align-items: center;
+      width: 100%;
+      background: transparent;
+      border: none;
+      border-radius: 6px;
+      color: rgba(255, 255, 255, 0.85);
+      font-size: 12px;
+      text-align: left;
+      padding: 6px 10px;
+      min-height: 36px;
+    }
+    .np-quality-item:hover,
+    .np-quality-item:focus {
+      background: rgba(255, 255, 255, 0.10);
+      outline: none;
+    }
+    .np-quality-item::before {
+      content: "";
+      display: inline-block;
+      width: 16px;
+      color: #e94c42;
+      font-weight: bold;
+      -webkit-flex-shrink: 0;
+      flex-shrink: 0;
+    }
+    .np-quality-item[aria-checked="true"] {
+      color: #ffffff;
+      font-weight: bold;
+    }
+    .np-quality-item[aria-checked="true"]::before {
+      content: "\2713";
+    }
+    .np-transport-row {
+      display: -webkit-box;
+      display: -webkit-flex;
+      display: flex;
+      -webkit-box-align: center;
+      -webkit-align-items: center;
+      align-items: center;
+      -webkit-box-pack: justify;
+      -webkit-justify-content: space-around;
+      justify-content: space-around;
+      padding: 2px 0;
+    }
+    .np-ctrl-btn {
+      background: transparent;
+      border: none;
+      color: rgba(255, 255, 255, 0.85);
+      min-width: 44px;
+      min-height: 44px;
+      padding: 6px;
+      font-size: 12px;
+    }
+    .np-ctrl-btn.off {
+      color: rgba(255, 255, 255, 0.4);
+    }
+    .np-play-btn {
+      width: 56px;
+      height: 56px;
+      min-width: 56px;
+      min-height: 56px;
+      border-radius: 50%;
+      border: 2px solid rgba(255, 255, 255, 0.86);
+      background: rgba(255, 255, 255, 0.08);
+      color: #ffffff;
+      font-size: 20px;
+      padding: 0;
+    }
+    .np-play-btn.playing {
+      border-color: #ffffff;
+      background: rgba(211, 58, 49, 0.34);
+    }
+    @media (min-height: 760px) {
+      .turntable-box {
+        -webkit-transform: scale(1.12);
+        transform: scale(1.12);
+      }
+    }
+    @media (max-height: 540px) {
+      .turntable-box {
+        -webkit-transform: scale(0.84);
+        transform: scale(0.84);
+      }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .vinyl-disc {
+        -webkit-animation: none;
+        animation: none;
+      }
+      .tonearm-wrap {
+        -webkit-transition: none;
+        transition: none;
+      }
+    }
+    @media (pointer: coarse) {
+      :root { --target-size: 44px; --bottom-bar-h: 82px; }
+      html { scroll-padding-bottom: calc(var(--bottom-bar-h) + env(safe-area-inset-bottom, 0px)); }
+      body { padding-bottom: calc(var(--bottom-bar-h) + 16px + env(safe-area-inset-bottom, 0px)); }
+      button, input[type=text], input[type=password], select { min-height: 44px; }
+      button, button.btn-sm, .pill-btn, .btn-heart, .btn-ctrl { min-height: 44px; min-width: 44px; }
+      .quality-mini { min-height: 24px; height: 24px; }
+      .np-quality-btn { min-height: 30px; height: 30px; min-width: 72px; }
+      .btn-circle-play { width: 44px; height: 44px; }
+      .np-pill-btn { min-height: 44px; min-width: 56px; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="app-shell">
+    <!-- Red Header Bar -->
+    <header class="top-header">
+      <button type="button" id="btn-toggle-settings" class="btn-ghost" aria-label="Menu and settings">
+        <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round">
+          <line x1="3" y1="6" x2="21" y2="6"></line>
+          <line x1="3" y1="12" x2="21" y2="12"></line>
+          <line x1="3" y1="18" x2="21" y2="18"></line>
+        </svg>
+      </button>
+
+      <div class="top-center">
+        <div class="top-title">
+          网易云 Gateway
+          <span id="ownership-badge" class="badge">IDLE</span>
+        </div>
+        <div class="top-sub">
+          <span id="account-status">未连接</span> · <span id="header-client-id">client</span>
+        </div>
+      </div>
+
+      <button type="button" id="btn-top-search" class="btn-ghost" aria-label="Open search">
+        <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="7"></circle>
+          <line x1="16.5" y1="16.5" x2="21" y2="21"></line>
+        </svg>
+      </button>
+    </header>
+
+    <!-- Collapsible Settings / Connection / QR Drawer -->
+    <section id="settings-panel" class="drawer-card" aria-label="Gateway connection settings">
+      <div class="form-row">
+        <label class="lbl" for="client-id-input">Client ID</label>
+        <input type="text" id="client-id-input" placeholder="bb10-passport">
+      </div>
+      <div class="form-row">
+        <label class="lbl" for="token-input">Token</label>
+        <input type="password" id="token-input" placeholder="Paste Gateway Bearer token">
+        <button type="button" id="btn-save-token" class="btn-primary btn-sm">连接</button>
+      </div>
+      <div style="display:-webkit-box; display:-webkit-flex; display:flex; -webkit-box-align:center; -webkit-align-items:center; align-items:center; -webkit-flex-wrap:wrap; flex-wrap:wrap;">
+        <button type="button" id="btn-check-auth" class="btn-sm" style="margin-right:6px;">检查登录</button>
+        <button type="button" id="btn-qr-start" class="btn-outline-red btn-sm" style="margin-right:10px;">扫码登录</button>
+        <label style="font-size:12px; cursor:pointer; display:-webkit-inline-box; display:-webkit-inline-flex; display:inline-flex; -webkit-box-align:center; -webkit-align-items:center; align-items:center;">
+          <input type="checkbox" id="chk-auto-next" checked style="margin-right:4px;"> 自动下一首 (Auto-Next)
+        </label>
+      </div>
+      <div id="qr-container" style="display:none; text-align:center;">
+        <div id="qr-svg-wrap" class="qr-box"></div>
+        <div id="qr-poll-msg" style="font-size:12px; color:#d33a31; margin-top:4px;"></div>
+      </div>
+    </section>
+
+    <!-- Main Sub-Navigation Tabs -->
+    <div class="tab-bar" role="tablist" focusgroup="tablist nomemory" aria-label="Music sections">
+      <button type="button" id="tab-discover" role="tab" aria-selected="true" focusgroupstart>个性推荐</button>
+      <button type="button" id="tab-playlists" role="tab" aria-selected="false">歌单</button>
+      <button type="button" id="tab-search" role="tab" aria-selected="false">搜索</button>
+      <button type="button" id="tab-queue" role="tab" aria-selected="false">队列 (<span id="queue-count">0</span>)</button>
+    </div>
+
+    <!-- Tab Panel 1: 个性推荐 (Discover: 心动模式 / 每日推荐 / 私人FM) -->
+    <div id="panel-discover" role="tabpanel" aria-labelledby="tab-discover" tabindex="0">
+      <div class="panel-inner">
+        <div class="quick-circles">
+          <button type="button" id="btn-heart-mode" class="circle-action">
+            <span class="circle-ring">
+              <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="#d33a31" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 21s-7-4.5-9.2-9C1.1 8.4 3.2 4.5 6.8 4.2c2-.2 3.8.9 5.2 2.6 1.4-1.7 3.2-2.8 5.2-2.6 3.6.3 5.7 4.2 4 7.8-2.2 4.5-9.2 9-9.2 9z"></path>
+                <polyline points="6 12 9 12 10.5 9 13 15 15 12 18 12"></polyline>
+              </svg>
+            </span>
+            <span class="circle-label">心动模式</span>
+          </button>
+
+          <button type="button" id="btn-daily-rec" class="circle-action active">
+            <span class="circle-ring">
+              <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="#d33a31" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="5" width="18" height="16" rx="2"></rect>
+                <line x1="8" y1="3" x2="8" y2="7"></line>
+                <line x1="16" y1="3" x2="16" y2="7"></line>
+                <line x1="3" y1="10" x2="21" y2="10"></line>
+              </svg>
+              <span id="daily-cal-day" class="circle-day">17</span>
+            </span>
+            <span class="circle-label">每日歌曲推荐</span>
+          </button>
+
+          <button type="button" id="btn-personal-fm" class="circle-action">
+            <span class="circle-ring">
+              <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="#d33a31" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="8" width="18" height="12" rx="2"></rect>
+                <line x1="7" y1="8" x2="16" y2="3"></line>
+                <circle cx="8.5" cy="14" r="2"></circle>
+                <line x1="13" y1="12" x2="18" y2="12"></line>
+                <line x1="13" y1="16" x2="18" y2="16"></line>
+              </svg>
+            </span>
+            <span class="circle-label">私人FM</span>
+          </button>
+        </div>
+
+        <div class="section-card">
+          <div class="section-head">
+            <span id="discover-title" class="section-title">每日歌曲推荐</span>
+            <div class="btn-row">
+              <button type="button" id="btn-discover-play-all" class="btn-primary btn-sm">全部播放</button>
+              <button type="button" id="btn-discover-queue" class="btn-sm">+Q 全部</button>
+            </div>
+          </div>
+          <div id="discover-note" class="status-note">连接后自动加载每日推荐歌曲</div>
+          <ul id="discover-list" class="track-list"></ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab Panel 2: 歌单 (Playlists + Heart Mode on Favorites + 50/page Pagination) -->
+    <div id="panel-playlists" role="tabpanel" aria-labelledby="tab-playlists" hidden style="display:none;">
+      <div class="panel-inner">
+        <div class="section-card">
+          <div class="form-row" style="margin-bottom:6px;">
+            <select id="playlist-select" style="-webkit-flex:1; flex:1; min-width:140px; margin-right:6px;">
+              <option value="">-- 连接后加载歌单 --</option>
+            </select>
+            <button type="button" id="btn-load-playlists" class="btn-sm">刷新</button>
+          </div>
+          <div id="playlist-pills" class="pill-bar"></div>
+        </div>
+
+        <div class="section-card">
+          <div id="playlist-toolbar" style="display:none;">
+            <div class="section-head">
+              <span id="playlist-header" class="section-title">歌单</span>
+              <div class="btn-row">
+                <button type="button" id="btn-pl-heart" class="btn-outline-red btn-sm">心动模式</button>
+                <button type="button" id="btn-play-playlist" class="btn-primary btn-sm">Play All</button>
+                <button type="button" id="btn-queue-page" class="btn-sm">+Q Page</button>
+              </div>
+            </div>
+            <div class="form-row">
+              <input type="text" id="playlist-filter" placeholder="歌单内筛选（歌名 / 歌手 / 专辑）...">
+              <button type="button" id="btn-clear-filter" class="btn-sm">清空</button>
+            </div>
+          </div>
+
+          <div id="playlist-status-note" class="status-note" style="display:none;"></div>
+
+          <div id="playlist-pager-top" class="pager" style="display:none;">
+            <button type="button" id="btn-pl-prev-top" class="btn-sm">&laquo; 上一页</button>
+            <span id="pl-page-info-top">1/1</span>
+            <button type="button" id="btn-pl-next-top" class="btn-sm">下一页 &raquo;</button>
+          </div>
+
+          <ul id="playlist-tracks-list" class="track-list"></ul>
+
+          <div id="playlist-pager-bot" class="pager" style="display:none;">
+            <button type="button" id="btn-pl-prev-bot" class="btn-sm">&laquo; 上一页</button>
+            <span id="pl-page-info-bot">1/1</span>
+            <button type="button" id="btn-pl-next-bot" class="btn-sm">下一页 &raquo;</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab Panel 3: 搜索 (Search) -->
+    <div id="panel-search" role="tabpanel" aria-labelledby="tab-search" hidden style="display:none;">
+      <div class="panel-inner">
+        <div class="section-card">
+          <div class="form-row">
+            <input type="text" id="search-input" placeholder="搜索歌曲、歌手或专辑...">
+            <button type="button" id="btn-search" class="btn-primary btn-sm">搜索</button>
+          </div>
+          <div id="search-summary" style="font-size:12px; color:#767676; margin-bottom:6px;"></div>
+          <ul id="search-list" class="track-list"></ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab Panel 4: 队列与日志 (Queue + Collapsible Diagnostics) -->
+    <div id="panel-queue" role="tabpanel" aria-labelledby="tab-queue" hidden style="display:none;">
+      <div class="panel-inner">
+        <div class="section-card">
+          <div class="section-head">
+            <span class="section-title">当前播放队列</span>
+            <button type="button" id="btn-clear-queue" class="btn-sm">清空队列</button>
+          </div>
+          <div id="queue-pager" class="pager" style="display:none;">
+            <button type="button" id="btn-q-prev" class="btn-sm">&laquo; 上一页</button>
+            <span id="q-page-info">1/1</span>
+            <button type="button" id="btn-q-next" class="btn-sm">下一页 &raquo;</button>
+          </div>
+          <ul id="queue-list" class="track-list"></ul>
+        </div>
+
+        <details class="log-details">
+          <summary>运行事件日志 (Event Log)</summary>
+          <div style="margin-top:6px; text-align:right;">
+            <button type="button" id="btn-clear-log" class="btn-sm">Clear Log</button>
+          </div>
+          <div id="log-box" class="log-box"></div>
+        </details>
+      </div>
+    </div>
+  </div>
+
+  <!-- Fixed Bottom Mini-Player Bar (Cover, Song Title, Artist, Heart, Play/Pause, Next, Queue) -->
+  <div class="bottom-player" role="region" aria-label="Playback bar">
+    <div class="bottom-inner">
+      <div class="seek-strip">
+        <input type="range" id="seek-bar" min="0" max="100" value="0" step="0.5" aria-label="Playback progress">
+        <span id="time-display" class="seek-time">00:00 / 00:00</span>
+        <select id="quality-select" class="quality-mini" aria-label="Audio quality">
+          <option value="standard" selected>标准</option>
+          <option value="higher">较高</option>
+          <option value="extreme">极高</option>
+          <option value="lossless">无损</option>
+        </select>
+      </div>
+
+      <div class="mini-row">
+        <button type="button" id="btn-open-now-playing" class="mini-open-trigger" aria-label="Open now playing turntable view">
+          <img id="mini-cover" class="mini-cover" width="42" height="42" alt="">
+          <span class="mini-info">
+            <span id="cur-track" class="mini-title">未在播放</span>
+            <span id="cur-artist" class="mini-artist">选择一首歌曲开始收听</span>
+          </span>
+        </button>
+        <div class="mini-controls">
+          <button type="button" id="btn-mini-heart" class="btn-heart" aria-label="Like current track">&#9825;</button>
+          <button type="button" id="btn-prev" class="btn-ctrl" aria-label="Previous track">&laquo;</button>
+          <button type="button" id="btn-play-pause" class="btn-circle-play" aria-label="Play or pause">&#9654;</button>
+          <button type="button" id="btn-next" class="btn-ctrl" aria-label="Next track">&raquo;</button>
+          <button type="button" id="btn-stop" class="btn-ctrl" aria-label="Stop playback" title="Stop">&#9632;</button>
+          <button type="button" id="btn-open-queue" class="btn-ctrl" aria-label="Open queue">&#8801;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Full-Screen Vinyl Turntable Now Playing Dialog -->
+  <dialog id="now-playing-dialog" class="np-dialog" aria-labelledby="np-title">
+    <div class="np-shell">
+      <div class="np-header">
+        <button type="button" id="btn-np-close" class="np-icon-btn" aria-label="Collapse now playing" autofocus>
+          <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;">
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
+        </button>
+        <div class="np-header-center">
+          <div id="np-context-title" class="np-context-title">正在播放</div>
+          <div id="np-sub-status" class="np-sub-status">IDLE</div>
+        </div>
+        <button type="button" id="btn-np-heart-mode" class="np-pill-btn" title="心动模式">心动</button>
+      </div>
+
+      <div class="np-stage">
+        <div id="turntable-box" class="turntable-box paused">
+          <div class="tonearm-wrap" aria-hidden="true">
+            <svg width="128" height="130" viewBox="0 0 128 130" fill="none">
+              <circle cx="16" cy="16" r="14" fill="rgba(255,255,255,0.16)"></circle>
+              <circle cx="16" cy="16" r="8.5" fill="#ffffff"></circle>
+              <circle cx="16" cy="16" r="3" fill="#444444"></circle>
+              <path d="M 16 16 L 34 62 Q 40 74 54 80 L 73 88" stroke="#ffffff" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"></path>
+              <g transform="translate(76, 89) rotate(23)">
+                <rect x="-4" y="-5" width="8" height="10" rx="2" fill="#dddddd"></rect>
+                <rect x="2" y="-6" width="16" height="12" rx="2.5" fill="#ffffff"></rect>
+                <line x1="8" y1="-3" x2="8" y2="3" stroke="#888888" stroke-width="1.5" stroke-linecap="round"></line>
+                <line x1="12" y1="-3" x2="12" y2="3" stroke="#888888" stroke-width="1.5" stroke-linecap="round"></line>
+              </g>
+            </svg>
+          </div>
+
+          <div class="vinyl-outer">
+            <div class="vinyl-disc">
+              <img id="np-cover" class="vinyl-cover" width="146" height="146" alt="">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="np-footer">
+        <div class="np-meta-row">
+          <div class="np-meta-text">
+            <h2 id="np-title" class="np-title">未在播放</h2>
+            <div id="np-artist" class="np-artist">选择一首歌曲开始收听</div>
+          </div>
+          <button type="button" id="btn-np-heart" class="np-heart-btn" aria-label="Like current track">&#9825;</button>
+        </div>
+
+        <div class="np-progress-area">
+          <div class="np-seek-wrap">
+            <div class="np-seek-track" aria-hidden="true">
+              <div id="np-seek-fill" class="np-seek-fill"></div>
+            </div>
+            <div id="np-seek-thumb" class="np-seek-thumb" aria-hidden="true"></div>
+            <input type="range" id="np-seek-bar" class="np-seek-input" min="0" max="100" value="0" step="0.5" aria-label="Playback progress">
+          </div>
+          <div class="np-time-row">
+            <span id="np-cur-time" class="np-time">00:00</span>
+            <div class="np-quality-wrap">
+              <button type="button" id="btn-np-quality" class="np-quality-btn" aria-haspopup="menu" aria-expanded="false">标准音质</button>
+              <div id="np-quality-menu" class="np-quality-menu" hidden style="display:none;">
+                <div id="np-quality-group" focusgroup="menu nomemory" aria-labelledby="btn-np-quality">
+                  <button type="button" class="np-quality-item" role="menuitemradio" aria-checked="true" data-quality="standard" data-label="标准音质">标准音质</button>
+                  <button type="button" class="np-quality-item" role="menuitemradio" aria-checked="false" data-quality="higher" data-label="较高音质">较高音质</button>
+                  <button type="button" class="np-quality-item" role="menuitemradio" aria-checked="false" data-quality="extreme" data-label="极高音质">极高音质</button>
+                  <button type="button" class="np-quality-item" role="menuitemradio" aria-checked="false" data-quality="lossless" data-label="无损音质">无损音质</button>
+                </div>
+              </div>
+            </div>
+            <span id="np-dur-time" class="np-time">00:00</span>
+          </div>
+        </div>
+
+        <div class="np-transport-row">
+          <button type="button" id="btn-np-auto" class="np-ctrl-btn" aria-label="Toggle auto-next">自动</button>
+          <button type="button" id="btn-np-prev" class="np-ctrl-btn" aria-label="Previous track">
+            <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" style="vertical-align:middle;">
+              <rect x="4" y="5" width="2.4" height="14" rx="1"></rect>
+              <polygon points="19,5 8,12 19,19"></polygon>
+            </svg>
+          </button>
+          <button type="button" id="btn-np-play-pause" class="np-play-btn" aria-label="Play or pause">&#9654;</button>
+          <button type="button" id="btn-np-next" class="np-ctrl-btn" aria-label="Next track">
+            <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" style="vertical-align:middle;">
+              <polygon points="5,5 16,12 5,19"></polygon>
+              <rect x="17.6" y="5" width="2.4" height="14" rx="1"></rect>
+            </svg>
+          </button>
+          <button type="button" id="btn-np-queue" class="np-ctrl-btn" aria-label="Open queue">
+            <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:middle;">
+              <line x1="4" y1="7" x2="20" y2="7"></line>
+              <line x1="4" y1="12" x2="20" y2="12"></line>
+              <line x1="4" y1="17" x2="14" y2="17"></line>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </dialog>
+
+  <audio id="audio-player" preload="auto"></audio>
+
+  <script>
+    (function () {
+      // Strict ES5 for BlackBerry 10 WebKit compatibility.
+      var STORAGE_TOKEN = "bb10_music163_gateway_token";
+      var STORAGE_CLIENT_ID = "bb10_music163_client_id";
+      var PAGE_SIZE = 50;
+      var FALLBACK_COVER = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 96 96'><rect width='96' height='96' rx='10' fill='%23eceef2'/><circle cx='48' cy='48' r='26' fill='%23d33a31' opacity='0.14'/><circle cx='48' cy='48' r='9' fill='%23d33a31'/></svg>";
+
+      var player = document.getElementById("audio-player");
+      var settingsPanel = document.getElementById("settings-panel");
+      var clientIdInput = document.getElementById("client-id-input");
+      var headerClientId = document.getElementById("header-client-id");
+      var tokenInput = document.getElementById("token-input");
+      var ownershipBadge = document.getElementById("ownership-badge");
+      var accountStatusSpan = document.getElementById("account-status");
+      var qrContainer = document.getElementById("qr-container");
+      var qrSvgWrap = document.getElementById("qr-svg-wrap");
+      var qrPollMsg = document.getElementById("qr-poll-msg");
+      var miniCover = document.getElementById("mini-cover");
+      var curTrackSpan = document.getElementById("cur-track");
+      var curArtistSpan = document.getElementById("cur-artist");
+      var btnMiniHeart = document.getElementById("btn-mini-heart");
+      var btnPlayPause = document.getElementById("btn-play-pause");
+      var timeDisplay = document.getElementById("time-display");
+      var seekBar = document.getElementById("seek-bar");
+      var qualitySelect = document.getElementById("quality-select");
+      var chkAutoNext = document.getElementById("chk-auto-next");
+
+      var npDialog = document.getElementById("now-playing-dialog");
+      var turntableBox = document.getElementById("turntable-box");
+      var npContextTitle = document.getElementById("np-context-title");
+      var npSubStatus = document.getElementById("np-sub-status");
+      var npCover = document.getElementById("np-cover");
+      var npTitle = document.getElementById("np-title");
+      var npArtist = document.getElementById("np-artist");
+      var btnNpHeart = document.getElementById("btn-np-heart");
+      var npSeekBar = document.getElementById("np-seek-bar");
+      var npSeekFill = document.getElementById("np-seek-fill");
+      var npSeekThumb = document.getElementById("np-seek-thumb");
+      var npCurTime = document.getElementById("np-cur-time");
+      var npDurTime = document.getElementById("np-dur-time");
+      var btnNpQuality = document.getElementById("btn-np-quality");
+      var npQualityMenu = document.getElementById("np-quality-menu");
+      var npQualityGroup = document.getElementById("np-quality-group");
+      var btnNpAuto = document.getElementById("btn-np-auto");
+      var btnNpPlayPause = document.getElementById("btn-np-play-pause");
+      var btnNpClose = document.getElementById("btn-np-close");
+
+      var discoverTitle = document.getElementById("discover-title");
+      var discoverNote = document.getElementById("discover-note");
+      var discoverList = document.getElementById("discover-list");
+      var searchInput = document.getElementById("search-input");
+      var searchSummary = document.getElementById("search-summary");
+      var searchList = document.getElementById("search-list");
+      var playlistSelect = document.getElementById("playlist-select");
+      var playlistPills = document.getElementById("playlist-pills");
+      var playlistToolbar = document.getElementById("playlist-toolbar");
+      var playlistHeader = document.getElementById("playlist-header");
+      var playlistFilter = document.getElementById("playlist-filter");
+      var playlistStatusNote = document.getElementById("playlist-status-note");
+      var playlistTracksList = document.getElementById("playlist-tracks-list");
+      var playlistPagerTop = document.getElementById("playlist-pager-top");
+      var playlistPagerBot = document.getElementById("playlist-pager-bot");
+      var queueList = document.getElementById("queue-list");
+      var queuePager = document.getElementById("queue-pager");
+      var queueCountSpan = document.getElementById("queue-count");
+      var logBox = document.getElementById("log-box");
+
+      var queue = [];
+      var queueIndex = -1;
+      var queuePage = 0;
+      var currentTrackObj = null;
+      var currentGen = 0;
+      var isOwner = false;
+      var playStateLabel = "IDLE";
+      var isSeeking = false;
+      var qrPollTimer = null;
+      var eventPollActive = false;
+      var activeEventXhr = null;
+      var cmdSeq = 0;
+      var consecutiveAudioErrors = 0;
+      var errorSkipTimer = null;
+
+      var loadedPlaylists = [];
+      var likedPlaylistId = null;
+      var likedMap = {};
+      var likedIdsList = [];
+      var discoverSongs = [];
+      var discoverContextLabel = "每日推荐";
+      var discoverLoaded = false;
+      var playlistsLoaded = false;
+      var activePlaylistId = null;
+      var activePlaylistName = "";
+      var activePlaylistSongs = [];
+      var filteredPlaylistSongs = [];
+      var playlistPage = 0;
+      var lastSearchResults = [];
+      var settingsExpanded = true;
+      var queueSourceLabel = "正在播放";
+      var lastFocusBeforeNp = null;
+
+      miniCover.src = FALLBACK_COVER;
+      miniCover.onerror = function () {
+        if (miniCover.src !== FALLBACK_COVER) {
+          miniCover.src = FALLBACK_COVER;
+        }
+      };
+
+      if (npCover) {
+        npCover.src = FALLBACK_COVER;
+        npCover.onerror = function () {
+          if (npCover.src !== FALLBACK_COVER) {
+            npCover.src = FALLBACK_COVER;
+          }
+        };
+      }
+
+      var dayEl = document.getElementById("daily-cal-day");
+      if (dayEl) {
+        dayEl.innerHTML = String(new Date().getDate());
+      }
+
+      function clearErrorSkipTimer() {
+        if (errorSkipTimer) {
+          clearTimeout(errorSkipTimer);
+          errorSkipTimer = null;
+        }
+      }
+
+      function log(msg) {
+        var d = new Date();
+        var h = String(d.getHours()); if (h.length < 2) h = "0" + h;
+        var m = String(d.getMinutes()); if (m.length < 2) m = "0" + m;
+        var s = String(d.getSeconds()); if (s.length < 2) s = "0" + s;
+        logBox.innerHTML += "[" + h + ":" + m + ":" + s + "] " + msg + "\n";
+        logBox.scrollTop = logBox.scrollHeight;
+      }
+
+      function setText(el, str) {
+        el.innerHTML = "";
+        el.appendChild(document.createTextNode(str));
+      }
+
+      function formatTime(sec) {
+        if (isNaN(sec) || sec < 0) sec = 0;
+        var m = Math.floor(sec / 60);
+        var s = Math.floor(sec % 60);
+        return (m < 10 ? "0" : "") + m + ":" + (s < 10 ? "0" : "") + s;
+      }
+
+      function formatDurationMs(ms) {
+        if (!ms || ms <= 0) return "";
+        return formatTime(Math.floor(ms / 1000));
+      }
+
+      function trimStr(s) {
+        return (s || "").replace(/^\s+|\s+$/g, "");
+      }
+
+      function coverThumbUrl(rawUrl, size) {
+        if (!rawUrl) return FALLBACK_COVER;
+        var clean = String(rawUrl);
+        var thumb = clean.indexOf("?") === -1 ? (clean + "?param=" + size + "y" + size) : clean;
+        if (window.location && window.location.protocol === "https:") {
+          return "/api/v1/cover?url=" + encodeURIComponent(thumb);
+        }
+        return thumb;
+      }
+
+      function nextIdemKey(prefix) {
+        cmdSeq += 1;
+        return clientIdInput.value + "-" + prefix + "-" + (new Date().getTime()) + "-" + cmdSeq;
+      }
+
+      function setSettingsVisible(visible) {
+        settingsExpanded = visible;
+        settingsPanel.style.display = visible ? "block" : "none";
+      }
+
+      document.getElementById("btn-toggle-settings").onclick = function () {
+        setSettingsVisible(!settingsExpanded);
+      };
+
+      function initIdentity() {
+        var isBB10 = navigator.userAgent.indexOf("BB10") !== -1 || navigator.userAgent.indexOf("PlayBook") !== -1;
+        var savedId = null;
+        try { savedId = window.localStorage.getItem(STORAGE_CLIENT_ID); } catch (e) {}
+        if (!savedId) {
+          var rand = Math.floor(Math.random() * 100000);
+          savedId = (isBB10 ? "bb10-" : "desktop-") + rand;
+          try { window.localStorage.setItem(STORAGE_CLIENT_ID, savedId); } catch (e) {}
+        }
+        clientIdInput.value = savedId;
+        setText(headerClientId, savedId);
+
+        var savedTok = null;
+        try { savedTok = window.localStorage.getItem(STORAGE_TOKEN); } catch (e) {}
+        if (window.location.hash && window.location.hash.indexOf("token=") !== -1) {
+          var hashTok = decodeURIComponent(window.location.hash.split("token=")[1].split("&")[0]);
+          if (hashTok) {
+            savedTok = hashTok;
+            try { window.localStorage.setItem(STORAGE_TOKEN, savedTok); } catch (e) {}
+          }
+        }
+        if (savedTok) {
+          tokenInput.value = savedTok;
+        }
+      }
+
+      function apiRequest(method, path, bodyObj, callback, timeoutMs) {
+        var token = trimStr(tokenInput.value);
+        if (!token) {
+          callback(401, { error: "missing_token", message: "Enter Gateway Token first" });
+          return null;
+        }
+        var xhr = new XMLHttpRequest();
+        xhr.open(method, path, true);
+        xhr.setRequestHeader("Authorization", "Bearer " + token);
+        if (timeoutMs) {
+          xhr.timeout = timeoutMs;
+        }
+        if (bodyObj !== null && bodyObj !== undefined) {
+          xhr.setRequestHeader("Content-Type", "application/json");
+        }
+        xhr.onreadystatechange = function () {
+          if (xhr.readyState !== 4) return;
+          var parsed = null;
+          try { parsed = JSON.parse(xhr.responseText); } catch (e) {}
+          callback(xhr.status, parsed, xhr.responseText);
+        };
+        xhr.onerror = function () {
+          callback(0, { error: "network_error", message: "XHR network failure" });
+        };
+        xhr.ontimeout = function () {
+          callback(0, { error: "timeout", message: "XHR request timed out" });
+        };
+        xhr.send(bodyObj !== null && bodyObj !== undefined ? JSON.stringify(bodyObj) : null);
+        return xhr;
+      }
+
+      function isLikedTrack(songId) {
+        if (!songId) return false;
+        return Boolean(likedMap[String(songId)]);
+      }
+
+      function syncNpSeekVisual(pct) {
+        var clamped = isNaN(pct) ? 0 : Math.max(0, Math.min(100, pct));
+        var pctStr = clamped.toFixed(2) + "%";
+        if (npSeekFill) npSeekFill.style.width = pctStr;
+        if (npSeekThumb) npSeekThumb.style.left = pctStr;
+      }
+
+      var QUALITY_LABELS = {
+        standard: "标准音质",
+        higher: "较高音质",
+        extreme: "极高音质",
+        lossless: "无损音质"
+      };
+
+      function syncQualityUi() {
+        var val = qualitySelect ? qualitySelect.value : "standard";
+        if (btnNpQuality) {
+          setText(btnNpQuality, QUALITY_LABELS[val] || "标准音质");
+        }
+        if (npQualityGroup) {
+          var items = npQualityGroup.getElementsByTagName("button");
+          for (var i = 0; i < items.length; i++) {
+            var q = items[i].getAttribute("data-quality");
+            items[i].setAttribute("aria-checked", q === val ? "true" : "false");
+          }
+        }
+      }
+
+      function isQualityMenuOpen() {
+        return npQualityMenu && !npQualityMenu.hasAttribute("hidden");
+      }
+
+      function openQualityMenu(enterFirst) {
+        if (!npQualityMenu) return;
+        syncQualityUi();
+        npQualityMenu.removeAttribute("hidden");
+        npQualityMenu.style.display = "block";
+        if (btnNpQuality) btnNpQuality.setAttribute("aria-expanded", "true");
+        if (enterFirst && npQualityGroup) {
+          var items = npQualityGroup.getElementsByTagName("button");
+          if (items.length > 0 && items[0].focus) items[0].focus();
+        }
+      }
+
+      function closeQualityMenu(restoreFocus) {
+        if (!npQualityMenu || !isQualityMenuOpen()) return;
+        npQualityMenu.setAttribute("hidden", "");
+        npQualityMenu.style.display = "none";
+        if (btnNpQuality) {
+          btnNpQuality.setAttribute("aria-expanded", "false");
+          if (restoreFocus && btnNpQuality.focus) {
+            try { btnNpQuality.focus(); } catch (e) {}
+          }
+        }
+      }
+
+      function syncAutoBtnUi() {
+        if (!btnNpAuto) return;
+        btnNpAuto.className = "np-ctrl-btn" + (chkAutoNext.checked ? "" : " off");
+        setText(btnNpAuto, chkAutoNext.checked ? "自动开" : "单曲停");
+      }
+
+      function isNowPlayingOpen() {
+        return npDialog && npDialog.hasAttribute("open");
+      }
+
+      function tryEnterFullscreen(targetEl) {
+        if (!targetEl) return;
+        try {
+          var fn = targetEl.requestFullscreen || targetEl.webkitRequestFullscreen || targetEl.webkitRequestFullScreen;
+          if (typeof fn === "function") {
+            var res = fn.call(targetEl);
+            if (res && typeof res.then === "function") {
+              res.then(null, function () {});
+            }
+          }
+        } catch (e) {}
+      }
+
+      function tryExitFullscreen() {
+        try {
+          var activeFs = document.fullscreenElement || document.webkitFullscreenElement || document.webkitIsFullScreen;
+          if (!activeFs) return;
+          var exitFn = document.exitFullscreen || document.webkitExitFullscreen || document.webkitCancelFullScreen;
+          if (typeof exitFn === "function") {
+            var res = exitFn.call(document);
+            if (res && typeof res.then === "function") {
+              res.then(null, function () {});
+            }
+          }
+        } catch (e) {}
+      }
+
+      function openNowPlaying() {
+        if (!npDialog || isNowPlayingOpen()) return;
+        lastFocusBeforeNp = document.activeElement || document.getElementById("btn-open-now-playing");
+        if (typeof npDialog.showModal === "function") {
+          try {
+            npDialog.showModal();
+            tryEnterFullscreen(npDialog);
+            return;
+          } catch (e) {}
+        }
+        npDialog.setAttribute("open", "");
+        tryEnterFullscreen(npDialog);
+        if (btnNpClose && btnNpClose.focus) {
+          try { btnNpClose.focus(); } catch (e2) {}
+        }
+      }
+
+      function closeNowPlaying() {
+        closeQualityMenu(false);
+        if (!npDialog || !isNowPlayingOpen()) return;
+        tryExitFullscreen();
+        if (typeof npDialog.close === "function") {
+          try {
+            npDialog.close();
+            return;
+          } catch (e) {}
+        }
+        npDialog.removeAttribute("open");
+        if (lastFocusBeforeNp && lastFocusBeforeNp.focus) {
+          try { lastFocusBeforeNp.focus(); } catch (e2) {}
+        }
+      }
+
+      function updateMiniPlayerDisplay(trackObj) {
+        if (trackObj) {
+          currentTrackObj = trackObj;
+          setText(curTrackSpan, trackObj.name || "未知曲目");
+          var sub = (trackObj.singer || "未知歌手") + (trackObj.album ? " · " + trackObj.album : "");
+          setText(curArtistSpan, sub + (playStateLabel ? " · " + playStateLabel : ""));
+          miniCover.src = coverThumbUrl(trackObj.pic_url, 120);
+          var liked = isLikedTrack(trackObj.id);
+          btnMiniHeart.innerHTML = liked ? "&#9829;" : "&#9825;";
+          btnMiniHeart.className = "btn-heart" + (liked ? " liked" : "");
+
+          if (npTitle) setText(npTitle, trackObj.name || "未知曲目");
+          if (npArtist) setText(npArtist, sub);
+          if (npCover) npCover.src = coverThumbUrl(trackObj.pic_url, 360);
+          if (npContextTitle) setText(npContextTitle, queueSourceLabel || "正在播放");
+          if (btnNpHeart) {
+            btnNpHeart.innerHTML = liked ? "&#9829;" : "&#9825;";
+            btnNpHeart.className = "np-heart-btn" + (liked ? " liked" : "");
+          }
+        } else {
+          btnMiniHeart.innerHTML = "&#9825;";
+          btnMiniHeart.className = "btn-heart";
+          if (btnNpHeart) {
+            btnNpHeart.innerHTML = "&#9825;";
+            btnNpHeart.className = "np-heart-btn";
+          }
+        }
+      }
+
+      function updateOwnershipUi(ownerFlag, gen, stateText, badgeText, extraBadgeClass) {
+        isOwner = ownerFlag;
+        currentGen = gen;
+        playStateLabel = stateText + " #" + gen;
+        setText(ownershipBadge, badgeText);
+        if (npSubStatus) {
+          setText(npSubStatus, badgeText + " · " + playStateLabel);
+        }
+        if (npContextTitle) {
+          setText(npContextTitle, queueSourceLabel || "正在播放");
+        }
+        if (ownerFlag) {
+          ownershipBadge.className = "badge badge-owner";
+        } else if (extraBadgeClass) {
+          ownershipBadge.className = "badge " + extraBadgeClass;
+        } else {
+          ownershipBadge.className = "badge" + (badgeText.indexOf("STOP") !== -1 || badgeText.indexOf("REVOKED") !== -1 ? " badge-stopped" : "");
+        }
+        if (currentTrackObj) {
+          var sub = (currentTrackObj.singer || "") + (currentTrackObj.album ? " · " + currentTrackObj.album : "");
+          setText(curArtistSpan, (sub ? sub + " · " : "") + playStateLabel);
+        }
+      }
+
+      function updatePlayButtonVisual(playing) {
+        btnPlayPause.innerHTML = playing ? "&#10074;&#10074;" : "&#9654;";
+        btnPlayPause.className = "btn-circle-play" + (playing ? " playing" : "");
+        if (btnNpPlayPause) {
+          btnNpPlayPause.innerHTML = playing ? "&#10074;&#10074;" : "&#9654;";
+          btnNpPlayPause.className = "np-play-btn" + (playing ? " playing" : "");
+          btnNpPlayPause.setAttribute("aria-label", playing ? "Pause" : "Play");
+        }
+        if (turntableBox) {
+          turntableBox.className = "turntable-box " + (playing ? "playing" : "paused");
+        }
+      }
+
+      function dropLocalMediaAndReset(reasonText, revokedGen) {
+        clearErrorSkipTimer();
+        player.pause();
+        try { player.currentTime = 0; } catch (e) {}
+        player.removeAttribute("src");
+        player.load();
+        updatePlayButtonVisual(false);
+        updateOwnershipUi(false, revokedGen || currentGen, "STOPPED", reasonText);
+        log("Local playback stopped and media buffer released: " + reasonText);
+      }
+
+      function sendStopAck(revokedGen) {
+        apiRequest("POST", "/api/v1/playback/ack-stop", {
+          client_id: clientIdInput.value,
+          revoked_generation: revokedGen,
+          idempotency_key: nextIdemKey("ack")
+        }, function (status) {
+          log("Sent stop ACK for gen=" + revokedGen + " (HTTP " + status + ")");
+        });
+      }
+
+      function syncInitialPlaybackState() {
+        var url = "/api/v1/playback/state?_t=" + (new Date().getTime());
+        apiRequest("GET", url, null, function (status, data) {
+          if (status !== 200 || !data) return;
+          if (isOwner && data.generation > currentGen && data.owner !== clientIdInput.value) {
+            var revoked = currentGen;
+            dropLocalMediaAndReset("STOPPED BY " + (data.owner || "OTHER"), data.generation);
+            if (revoked > 0) sendStopAck(revoked);
+            return;
+          }
+          if (!isOwner && data.generation > currentGen) {
+            currentGen = data.generation;
+          }
+          if (!isOwner && data.owner && data.status !== "stopped" && data.status !== "idle") {
+            updateOwnershipUi(false, data.generation, "ON: " + data.owner, "BUSY", "badge-other");
+            if (data.current_track) {
+              var remoteTrack = {
+                id: data.current_track.track ? data.current_track.track.track_id : "",
+                name: data.current_track.title || "正在其他设备播放",
+                singer: data.current_track.artist || "",
+                pic_url: data.current_track.pic_url || ""
+              };
+              updateMiniPlayerDisplay(remoteTrack);
+            }
+          }
+        });
+      }
+
+      function startEventLongPoll() {
+        if (eventPollActive) return;
+        eventPollActive = true;
+        pollNextEvent();
+      }
+
+      function pollNextEvent() {
+        if (!eventPollActive) return;
+        var token = trimStr(tokenInput.value);
+        if (!token) {
+          eventPollActive = false;
+          return;
+        }
+        var url = "/api/v1/playback/events?client_id=" + encodeURIComponent(clientIdInput.value) +
+          "&known_generation=" + encodeURIComponent(String(currentGen)) +
+          "&wait_ms=15000&_t=" + (new Date().getTime());
+        activeEventXhr = apiRequest("GET", url, null, function (status, data) {
+          activeEventXhr = null;
+          if (!eventPollActive) return;
+          if (status === 200 && data) {
+            if (data.stop_required) {
+              log("Received STOP instruction from gateway (new owner: " + (data.owner_client_id || "other") + ", gen=" + data.generation + ")");
+              dropLocalMediaAndReset("STOPPED BY " + (data.owner_client_id || "OTHER"), data.generation);
+              sendStopAck(data.revoked_generation || currentGen);
+            } else if (data.generation && data.generation > currentGen && !isOwner) {
+              currentGen = data.generation;
+            }
+            setTimeout(pollNextEvent, 150);
+          } else if (status === 401) {
+            eventPollActive = false;
+            log("Event listener paused: unauthorized token");
+          } else {
+            setTimeout(pollNextEvent, 1500);
+          }
+        }, 20000);
+      }
+
+      function sendPlaybackCommand(kind, trackObj, extraPositionSecs) {
+        var payload = {
+          client_id: clientIdInput.value,
+          kind: kind,
+          expected_generation: currentGen,
+          idempotency_key: nextIdemKey(kind),
+          track: trackObj ? { provider: "netease", track_id: String(trackObj.id) } : null,
+          track_title: trackObj ? (trackObj.name || null) : null,
+          track_artist: trackObj ? (trackObj.singer || null) : null,
+          duration_ms: trackObj && trackObj.duration_ms ? trackObj.duration_ms : null,
+          pic_url: trackObj && trackObj.pic_url ? trackObj.pic_url : null,
+          quality: qualitySelect.value,
+          position_secs: extraPositionSecs !== undefined ? extraPositionSecs : null
+        };
+        apiRequest("POST", "/api/v1/playback/command", payload, function (status, data) {
+          if (status !== 200 || !data) {
+            log("Command " + kind + " rejected (" + status + "): " + (data && data.message ? data.message : "error"));
+            if (status === 409 && data && data.generation) {
+              dropLocalMediaAndReset("STALE GEN", data.generation);
+            }
+            return;
+          }
+          if (!data.accepted) {
+            log("Command " + kind + " ignored: " + (data.rejection_reason || "ownership lost"));
+            if (isOwner && data.generation > currentGen) {
+              dropLocalMediaAndReset("REVOKED", data.generation);
+            }
+            return;
+          }
+          currentGen = data.generation;
+          if (kind === "explicit_play" || kind === "auto_next") {
+            updateOwnershipUi(true, data.generation, "LOADING", "OWNER");
+            if (trackObj) {
+              updateMiniPlayerDisplay(trackObj);
+            }
+            if (data.media_url) {
+              log("Playing gen=" + data.generation + " via " + data.media_url);
+              var targetMediaUrl = data.media_url;
+              var playGen = data.generation;
+              // Flush previous mm-renderer pipeline on BB10 before opening the next track.
+              player.pause();
+              player.removeAttribute("src");
+              player.load();
+              setTimeout(function () {
+                if (currentGen !== playGen) return;
+                player.src = targetMediaUrl;
+                player.load();
+                player.play();
+              }, 60);
+            } else if (data.media_error) {
+              log("Media resolve error: " + data.media_error);
+            }
+          } else if (kind === "stop") {
+            dropLocalMediaAndReset("STOPPED", data.generation);
+          } else if (kind === "pause") {
+            player.pause();
+            updateOwnershipUi(true, data.generation, "PAUSED", "OWNER");
+            updatePlayButtonVisual(false);
+          } else if (kind === "resume") {
+            player.play();
+            updateOwnershipUi(true, data.generation, "PLAYING", "OWNER");
+            updatePlayButtonVisual(true);
+          }
+        });
+      }
+
+      function refreshAllTrackViews() {
+        if (discoverSongs.length > 0) renderDiscoverList();
+        if (activePlaylistSongs.length > 0) renderPlaylistPage();
+        if (lastSearchResults.length > 0) renderSearchResults(lastSearchResults);
+        renderQueue();
+        if (currentTrackObj) updateMiniPlayerDisplay(currentTrackObj);
+      }
+
+      function toggleLikeSong(songId) {
+        if (!songId) return;
+        var currentlyLiked = isLikedTrack(songId);
+        var nextLike = !currentlyLiked;
+        apiRequest("POST", "/api/v1/tracks/" + encodeURIComponent(String(songId)) + "/like", { like: nextLike }, function (status, data) {
+          if (status !== 200 || !data || !data.ok) {
+            log("Like failed (" + status + ") for track " + songId);
+            return;
+          }
+          if (nextLike) {
+            likedMap[String(songId)] = true;
+            if (likedIdsList.indexOf(Number(songId)) === -1) {
+              likedIdsList.unshift(Number(songId));
+            }
+          } else {
+            delete likedMap[String(songId)];
+          }
+          log((nextLike ? "Added to" : "Removed from") + " Favorites: track " + songId);
+          refreshAllTrackViews();
+        });
+      }
+
+      function playQueueIndex(idx, isAuto) {
+        if (idx < 0 || idx >= queue.length) return;
+        clearErrorSkipTimer();
+        if (!isAuto) consecutiveAudioErrors = 0;
+        queueIndex = idx;
+        queuePage = Math.floor(idx / PAGE_SIZE);
+        var item = queue[idx];
+        refreshAllTrackViews();
+        sendPlaybackCommand(isAuto ? "auto_next" : "explicit_play", item);
+      }
+
+      function replaceQueueAndPlay(items, startIdx, sourceLabel) {
+        if (!items || items.length === 0) return;
+        if (sourceLabel) {
+          queueSourceLabel = sourceLabel;
+        }
+        queue = items.slice(0);
+        playQueueIndex(startIdx || 0, false);
+      }
+
+      function addToQueue(item, playNow) {
+        queue.push(item);
+        if (playNow) {
+          playQueueIndex(queue.length - 1, false);
+        } else {
+          renderQueue();
+        }
+      }
+
+      function createTrackRow(t, displayNum, isActive, onPlay, onQueue) {
+        var li = document.createElement("li");
+        li.className = "track-row" + (isActive ? " active" : "");
+
+        if (displayNum !== null) {
+          var numEl = document.createElement("div");
+          numEl.className = "track-num";
+          numEl.appendChild(document.createTextNode(String(displayNum)));
+          li.appendChild(numEl);
+        }
+
+        var img = document.createElement("img");
+        img.className = "track-cover";
+        img.width = 40;
+        img.height = 40;
+        img.alt = "";
+        img.src = coverThumbUrl(t.pic_url, 80);
+        img.onerror = function () {
+          if (img.src !== FALLBACK_COVER) img.src = FALLBACK_COVER;
+        };
+        li.appendChild(img);
+
+        var meta = document.createElement("div");
+        meta.className = "track-meta";
+        var title = document.createElement("div");
+        title.className = "track-name";
+        title.appendChild(document.createTextNode(t.name));
+
+        var dur = formatDurationMs(t.duration_ms);
+        var subText = (t.singer || "Unknown") + (t.album ? " - " + t.album : "") + (dur ? " (" + dur + ")" : "");
+        var sub = document.createElement("div");
+        sub.className = "track-sub";
+        sub.appendChild(document.createTextNode(subText));
+        meta.appendChild(title);
+        meta.appendChild(sub);
+        li.appendChild(meta);
+
+        var actions = document.createElement("div");
+        actions.className = "track-actions";
+
+        var liked = isLikedTrack(t.id);
+        var btnHeart = document.createElement("button");
+        btnHeart.type = "button";
+        btnHeart.className = "btn-heart" + (liked ? " liked" : "");
+        btnHeart.innerHTML = liked ? "&#9829;" : "&#9825;";
+        btnHeart.setAttribute("aria-label", liked ? "Unlike" : "Like");
+        btnHeart.onclick = (function (sid) {
+          return function () { toggleLikeSong(sid); };
+        })(t.id);
+        actions.appendChild(btnHeart);
+
+        var btnPlay = document.createElement("button");
+        btnPlay.type = "button";
+        btnPlay.className = "btn-primary btn-sm";
+        btnPlay.appendChild(document.createTextNode("Play"));
+        btnPlay.onclick = onPlay;
+        actions.appendChild(btnPlay);
+
+        if (onQueue) {
+          var btnAdd = document.createElement("button");
+          btnAdd.type = "button";
+          btnAdd.className = "btn-sm";
+          btnAdd.style.marginLeft = "4px";
+          btnAdd.appendChild(document.createTextNode("+Q"));
+          btnAdd.onclick = onQueue;
+          actions.appendChild(btnAdd);
+        }
+
+        li.appendChild(actions);
+        return li;
+      }
+
+      function renderDiscoverList() {
+        discoverList.innerHTML = "";
+        if (discoverSongs.length === 0) return;
+        var activeId = currentTrackObj ? String(currentTrackObj.id) : "";
+        for (var i = 0; i < discoverSongs.length; i++) {
+          var t = discoverSongs[i];
+          var row = createTrackRow(
+            t,
+            i + 1,
+            activeId && String(t.id) === activeId,
+            (function (idx) {
+              return function () { replaceQueueAndPlay(discoverSongs, idx, discoverContextLabel); };
+            })(i),
+            (function (track) {
+              return function () {
+                addToQueue(track, false);
+                log("Queued: " + track.name);
+              };
+            })(t)
+          );
+          discoverList.appendChild(row);
+        }
+      }
+
+      function setActiveCircle(btnId) {
+        var ids = ["btn-heart-mode", "btn-daily-rec", "btn-personal-fm"];
+        for (var i = 0; i < ids.length; i++) {
+          var el = document.getElementById(ids[i]);
+          el.className = "circle-action" + (ids[i] === btnId ? " active" : "");
+        }
+      }
+
+      function loadDailyRecommendations(autoPlayFirst) {
+        discoverContextLabel = "每日推荐";
+        setActiveCircle("btn-daily-rec");
+        setText(discoverTitle, "每日歌曲推荐");
+        discoverNote.style.display = "block";
+        setText(discoverNote, "正在加载每日推荐...");
+        discoverList.innerHTML = "";
+        apiRequest("GET", "/api/v1/recommend/songs", null, function (status, data) {
+          if (status !== 200 || !data || !data.tracks) {
+            setText(discoverNote, "加载每日推荐失败 (" + status + ")");
+            return;
+          }
+          discoverLoaded = true;
+          discoverSongs = data.tracks;
+          setText(discoverTitle, "每日歌曲推荐 (" + discoverSongs.length + ")");
+          discoverNote.style.display = discoverSongs.length === 0 ? "block" : "none";
+          if (discoverSongs.length === 0) {
+            setText(discoverNote, "暂无每日推荐曲目");
+          }
+          renderDiscoverList();
+          log("Loaded Daily Recommend: " + discoverSongs.length + " track(s)");
+          if (autoPlayFirst && discoverSongs.length > 0) {
+            replaceQueueAndPlay(discoverSongs, 0, "每日推荐");
+          }
+        });
+      }
+
+      function loadPersonalFm(autoPlayFirst) {
+        discoverContextLabel = "私人FM";
+        setActiveCircle("btn-personal-fm");
+        setText(discoverTitle, "私人FM");
+        discoverNote.style.display = "block";
+        setText(discoverNote, "正在加载私人FM...");
+        discoverList.innerHTML = "";
+        apiRequest("GET", "/api/v1/personal-fm", null, function (status, data) {
+          if (status !== 200 || !data || !data.tracks) {
+            setText(discoverNote, "加载私人FM失败 (" + status + ")");
+            return;
+          }
+          discoverSongs = data.tracks;
+          setText(discoverTitle, "私人FM (" + discoverSongs.length + ")");
+          discoverNote.style.display = discoverSongs.length === 0 ? "block" : "none";
+          renderDiscoverList();
+          log("Loaded Personal FM: " + discoverSongs.length + " track(s)");
+          if (autoPlayFirst && discoverSongs.length > 0) {
+            replaceQueueAndPlay(discoverSongs, 0, "私人FM");
+          }
+        });
+      }
+
+      function loadHeartMode() {
+        discoverContextLabel = "心动模式";
+        setActiveCircle("btn-heart-mode");
+        var pid = likedPlaylistId || activePlaylistId || (loadedPlaylists.length > 0 ? loadedPlaylists[0].id : 0);
+        var sid = (currentTrackObj && currentTrackObj.id) ? currentTrackObj.id
+          : (likedIdsList.length > 0 ? likedIdsList[0]
+          : (activePlaylistSongs.length > 0 ? activePlaylistSongs[0].id : 0));
+        if (!pid || !sid) {
+          discoverNote.style.display = "block";
+          setText(discoverNote, "请先加载歌单或喜欢的音乐，再启动心动模式。");
+          return;
+        }
+        showTab("discover");
+        setText(discoverTitle, "心动模式");
+        discoverNote.style.display = "block";
+        setText(discoverNote, "正在根据喜好生成心动歌单...");
+        discoverList.innerHTML = "";
+        var path = "/api/v1/intelligence?song_id=" + encodeURIComponent(String(sid)) +
+          "&playlist_id=" + encodeURIComponent(String(pid));
+        apiRequest("GET", path, null, function (status, data) {
+          if (status !== 200 || !data || !data.tracks) {
+            setText(discoverNote, "心动模式加载失败 (" + status + ")");
+            return;
+          }
+          discoverSongs = data.tracks;
+          setText(discoverTitle, "心动模式 (" + discoverSongs.length + ")");
+          discoverNote.style.display = discoverSongs.length === 0 ? "block" : "none";
+          renderDiscoverList();
+          log("Loaded Heart Mode: " + discoverSongs.length + " track(s)");
+          if (discoverSongs.length > 0) {
+            replaceQueueAndPlay(discoverSongs, 0, "心动模式");
+          }
+        });
+      }
+
+      function loadLikedSongIds() {
+        apiRequest("GET", "/api/v1/likelist", null, function (status, data) {
+          if (status !== 200 || !data || !data.song_ids) return;
+          likedMap = {};
+          likedIdsList = data.song_ids;
+          for (var i = 0; i < data.song_ids.length; i++) {
+            likedMap[String(data.song_ids[i])] = true;
+          }
+          log("Loaded " + data.song_ids.length + " liked track IDs");
+          refreshAllTrackViews();
+        });
+      }
+
+      function renderSearchResults(items) {
+        lastSearchResults = items;
+        searchList.innerHTML = "";
+        setText(searchSummary, "找到 " + items.length + " 首");
+        var activeId = currentTrackObj ? String(currentTrackObj.id) : "";
+        for (var i = 0; i < items.length; i++) {
+          var t = items[i];
+          var row = createTrackRow(
+            t,
+            i + 1,
+            activeId && String(t.id) === activeId,
+            (function (track) {
+              return function () {
+                queueSourceLabel = "搜索结果";
+                addToQueue(track, true);
+              };
+            })(t),
+            (function (track) {
+              return function () {
+                addToQueue(track, false);
+                log("Queued: " + track.name);
+              };
+            })(t)
+          );
+          searchList.appendChild(row);
+        }
+      }
+
+      function setPlaylistNotice(msg) {
+        if (!msg) {
+          playlistStatusNote.style.display = "none";
+          return;
+        }
+        setText(playlistStatusNote, msg);
+        playlistStatusNote.style.display = "block";
+      }
+
+      function renderPlaylistPage() {
+        playlistTracksList.innerHTML = "";
+        var total = filteredPlaylistSongs.length;
+        if (total === 0) {
+          playlistPagerTop.style.display = "none";
+          playlistPagerBot.style.display = "none";
+          if (activePlaylistId !== null) {
+            setPlaylistNotice("当前筛选无匹配歌曲。");
+          }
+          return;
+        }
+        setPlaylistNotice("");
+        var totalPages = Math.ceil(total / PAGE_SIZE);
+        if (playlistPage < 0) playlistPage = 0;
+        if (playlistPage >= totalPages) playlistPage = totalPages - 1;
+
+        var start = playlistPage * PAGE_SIZE;
+        var end = Math.min(start + PAGE_SIZE, total);
+        var infoStr = "第 " + (playlistPage + 1) + "/" + totalPages + " 页 (" + (start + 1) + "-" + end + " / 共 " + total + " 首)";
+
+        var showPager = total > PAGE_SIZE ? "" : "none";
+        playlistPagerTop.style.display = showPager;
+        playlistPagerBot.style.display = showPager;
+        setText(document.getElementById("pl-page-info-top"), infoStr);
+        setText(document.getElementById("pl-page-info-bot"), infoStr);
+        document.getElementById("btn-pl-prev-top").disabled = playlistPage === 0;
+        document.getElementById("btn-pl-prev-bot").disabled = playlistPage === 0;
+        document.getElementById("btn-pl-next-top").disabled = playlistPage >= totalPages - 1;
+        document.getElementById("btn-pl-next-bot").disabled = playlistPage >= totalPages - 1;
+
+        var activeId = currentTrackObj ? String(currentTrackObj.id) : "";
+        for (var i = start; i < end; i++) {
+          var t = filteredPlaylistSongs[i];
+          var row = createTrackRow(
+            t,
+            i + 1,
+            activeId && String(t.id) === activeId,
+            (function (idx) {
+              return function () { replaceQueueAndPlay(filteredPlaylistSongs, idx, activePlaylistName || "歌单"); };
+            })(i),
+            (function (track) {
+              return function () {
+                addToQueue(track, false);
+                log("Queued: " + track.name);
+              };
+            })(t)
+          );
+          playlistTracksList.appendChild(row);
+        }
+      }
+
+      function applyPlaylistFilter() {
+        var q = trimStr(playlistFilter.value).toLowerCase();
+        if (!q) {
+          filteredPlaylistSongs = activePlaylistSongs.slice(0);
+        } else {
+          var out = [];
+          for (var i = 0; i < activePlaylistSongs.length; i++) {
+            var s = activePlaylistSongs[i];
+            var hay = ((s.name || "") + " " + (s.singer || "") + " " + (s.album || "")).toLowerCase();
+            if (hay.indexOf(q) !== -1) {
+              out.push(s);
+            }
+          }
+          filteredPlaylistSongs = out;
+        }
+        playlistPage = 0;
+        renderPlaylistPage();
+      }
+
+      function renderPlaylistPills() {
+        playlistPills.innerHTML = "";
+        var maxPills = Math.min(loadedPlaylists.length, 6);
+        for (var i = 0; i < maxPills; i++) {
+          var pl = loadedPlaylists[i];
+          var btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "pill-btn" + (pl.id === activePlaylistId ? " active" : "");
+          btn.appendChild(document.createTextNode(pl.name));
+          btn.onclick = (function (playlist) {
+            return function () { openPlaylist(playlist.id, playlist.name, false); };
+          })(pl);
+          playlistPills.appendChild(btn);
+        }
+      }
+
+      function openPlaylist(playlistId, playlistName, forceRefresh) {
+        if (!playlistId) return;
+        activePlaylistId = playlistId;
+        activePlaylistName = playlistName || ("Playlist #" + playlistId);
+        playlistSelect.value = String(playlistId);
+        renderPlaylistPills();
+
+        playlistToolbar.style.display = "none";
+        playlistPagerTop.style.display = "none";
+        playlistPagerBot.style.display = "none";
+        playlistTracksList.innerHTML = "";
+        setPlaylistNotice("正在加载 '" + activePlaylistName + "' ...");
+
+        var path = "/api/v1/playlists/" + playlistId + (forceRefresh ? "?refresh=true" : "");
+        apiRequest("GET", path, null, function (s2, detail) {
+          if (s2 !== 200 || !detail || !detail.songs) {
+            setPlaylistNotice("加载失败 (" + s2 + ")，请点击刷新重试");
+            log("Load playlist detail failed (" + s2 + ")");
+            return;
+          }
+          activePlaylistName = detail.name || activePlaylistName;
+          activePlaylistSongs = detail.songs;
+          playlistFilter.value = "";
+          setText(playlistHeader, activePlaylistName + " (" + detail.songs.length + ")");
+          playlistToolbar.style.display = "block";
+          applyPlaylistFilter();
+          log("Loaded playlist '" + activePlaylistName + "' (" + detail.songs.length + " songs)");
+        });
+      }
+
+      function loadUserPlaylists(autoOpenFirst) {
+        apiRequest("GET", "/api/v1/playlists?limit=50", null, function (status, data) {
+          if (status !== 200 || !data || !data.playlists) {
+            setPlaylistNotice("歌单加载失败 (" + status + ")");
+            return;
+          }
+          playlistsLoaded = true;
+          loadedPlaylists = data.playlists;
+          playlistSelect.innerHTML = "";
+          if (loadedPlaylists.length === 0) {
+            var optEmpty = document.createElement("option");
+            optEmpty.value = "";
+            optEmpty.appendChild(document.createTextNode("-- 暂无歌单 --"));
+            playlistSelect.appendChild(optEmpty);
+            setPlaylistNotice("未找到歌单");
+            return;
+          }
+          for (var i = 0; i < loadedPlaylists.length; i++) {
+            var pl = loadedPlaylists[i];
+            if (pl.special_type === 5 && !likedPlaylistId) {
+              likedPlaylistId = pl.id;
+            }
+            var opt = document.createElement("option");
+            opt.value = String(pl.id);
+            opt.appendChild(document.createTextNode(pl.name + " (by " + pl.author + ")"));
+            playlistSelect.appendChild(opt);
+          }
+          if (!likedPlaylistId && loadedPlaylists.length > 0) {
+            likedPlaylistId = loadedPlaylists[0].id;
+          }
+          renderPlaylistPills();
+          log("Loaded " + loadedPlaylists.length + " playlist(s)");
+          if (autoOpenFirst && activePlaylistId === null) {
+            openPlaylist(loadedPlaylists[0].id, loadedPlaylists[0].name, false);
+          }
+        });
+      }
+
+      function renderQueue() {
+        setText(queueCountSpan, String(queue.length));
+        queueList.innerHTML = "";
+        if (queue.length === 0) {
+          queuePager.style.display = "none";
+          return;
+        }
+        var totalPages = Math.ceil(queue.length / PAGE_SIZE);
+        if (queuePage < 0) queuePage = 0;
+        if (queuePage >= totalPages) queuePage = totalPages - 1;
+
+        var start = queuePage * PAGE_SIZE;
+        var end = Math.min(start + PAGE_SIZE, queue.length);
+        queuePager.style.display = queue.length > PAGE_SIZE ? "" : "none";
+        setText(document.getElementById("q-page-info"), "第 " + (queuePage + 1) + "/" + totalPages + " 页 (" + (start + 1) + "-" + end + " / 共 " + queue.length + " 首)");
+        document.getElementById("btn-q-prev").disabled = queuePage === 0;
+        document.getElementById("btn-q-next").disabled = queuePage >= totalPages - 1;
+
+        for (var i = start; i < end; i++) {
+          var t = queue[i];
+          var row = createTrackRow(
+            t,
+            i + 1,
+            i === queueIndex,
+            (function (idx) {
+              return function () { playQueueIndex(idx, false); };
+            })(i),
+            null
+          );
+          queueList.appendChild(row);
+        }
+      }
+
+      function checkAuthStatus() {
+        apiRequest("GET", "/api/v1/auth/status", null, function (status, data) {
+          if (status !== 200 || !data) {
+            setText(accountStatusSpan, "检查失败 (" + status + ")");
+            return;
+          }
+          if (data.state === "authenticated") {
+            setText(accountStatusSpan, data.profile.nickname);
+            qrContainer.style.display = "none";
+            setSettingsVisible(false);
+            if (!discoverLoaded) {
+              loadDailyRecommendations(false);
+            }
+            if (!playlistsLoaded) {
+              loadUserPlaylists(true);
+              loadLikedSongIds();
+            }
+          } else if (data.state === "confirmed_logged_out") {
+            setText(accountStatusSpan, "未登录，请扫码");
+            setSettingsVisible(true);
+          } else {
+            setText(accountStatusSpan, "网络错误: " + (data.message || data.kind));
+          }
+        });
+      }
+
+      function pollQrOnce(unikey) {
+        apiRequest("POST", "/api/v1/auth/qr/poll", { unikey: unikey }, function (status, data) {
+          if (status !== 200 || !data) {
+            setText(qrPollMsg, "Poll error (" + status + ")");
+            return;
+          }
+          if (data.status === "waiting_for_scan") {
+            setText(qrPollMsg, "请用网易云音乐扫码 (" + data.polls_remaining + ")");
+            qrPollTimer = setTimeout(function () { pollQrOnce(unikey); }, 2000);
+          } else if (data.status === "waiting_for_confirm") {
+            setText(qrPollMsg, "已扫码，请在手机确认 (" + data.polls_remaining + ")");
+            qrPollTimer = setTimeout(function () { pollQrOnce(unikey); }, 2000);
+          } else if (data.status === "confirmed") {
+            setText(qrPollMsg, "登录成功！");
+            discoverLoaded = false;
+            playlistsLoaded = false;
+            checkAuthStatus();
+          } else {
+            setText(qrPollMsg, "扫码结束: " + (data.message || data.reason || data.status));
+          }
+        });
+      }
+
+      // Tabs per modern-web-guidance tabs rules + BB10 fallback
+      var tabIds = ["discover", "playlists", "search", "queue"];
+      function showTab(name) {
+        for (var i = 0; i < tabIds.length; i++) {
+          var id = tabIds[i];
+          var selected = id === name;
+          var tabEl = document.getElementById("tab-" + id);
+          var panelEl = document.getElementById("panel-" + id);
+          tabEl.setAttribute("aria-selected", selected ? "true" : "false");
+          if (selected) {
+            tabEl.setAttribute("focusgroupstart", "");
+            panelEl.removeAttribute("hidden");
+            panelEl.style.display = "block";
+            panelEl.setAttribute("tabindex", "0");
+          } else {
+            tabEl.removeAttribute("focusgroupstart");
+            panelEl.setAttribute("hidden", "");
+            panelEl.style.display = "none";
+            panelEl.removeAttribute("tabindex");
+          }
+        }
+        if (name === "playlists" && !playlistsLoaded && trimStr(tokenInput.value)) {
+          loadUserPlaylists(true);
+        }
+      }
+
+      for (var ti = 0; ti < tabIds.length; ti++) {
+        (function (tabName, tabIndex) {
+          var btn = document.getElementById("tab-" + tabName);
+          btn.onclick = function () { showTab(tabName); };
+          btn.onkeydown = function (e) {
+            var ev = e || window.event;
+            if (!ev) return;
+            var code = ev.keyCode;
+            var nextIdx = -1;
+            if (code === 39) nextIdx = (tabIndex + 1) % tabIds.length;
+            else if (code === 37) nextIdx = (tabIndex - 1 + tabIds.length) % tabIds.length;
+            if (nextIdx !== -1) {
+              var nextTab = document.getElementById("tab-" + tabIds[nextIdx]);
+              showTab(tabIds[nextIdx]);
+              nextTab.focus();
+            }
+          };
+        })(tabIds[ti], ti);
+      }
+
+      document.getElementById("btn-top-search").onclick = function () {
+        showTab("search");
+        searchInput.focus();
+      };
+      document.getElementById("btn-open-queue").onclick = function () {
+        showTab("queue");
+      };
+
+      document.getElementById("btn-daily-rec").onclick = function () {
+        loadDailyRecommendations(discoverSongs.length > 0 && discoverTitle.firstChild && discoverTitle.firstChild.nodeValue.indexOf("每日") === 0 ? false : true);
+      };
+      document.getElementById("btn-personal-fm").onclick = function () {
+        loadPersonalFm(true);
+      };
+      document.getElementById("btn-heart-mode").onclick = loadHeartMode;
+      document.getElementById("btn-pl-heart").onclick = loadHeartMode;
+
+      document.getElementById("btn-discover-play-all").onclick = function () {
+        replaceQueueAndPlay(discoverSongs, 0, discoverContextLabel);
+      };
+      document.getElementById("btn-discover-queue").onclick = function () {
+        for (var i = 0; i < discoverSongs.length; i++) {
+          queue.push(discoverSongs[i]);
+        }
+        renderQueue();
+        log("Queued " + discoverSongs.length + " track(s)");
+      };
+
+      function doConnect() {
+        var cid = trimStr(clientIdInput.value) || ("client-" + Math.floor(Math.random() * 10000));
+        clientIdInput.value = cid;
+        setText(headerClientId, cid);
+        try {
+          window.localStorage.setItem(STORAGE_TOKEN, trimStr(tokenInput.value));
+          window.localStorage.setItem(STORAGE_CLIENT_ID, cid);
+        } catch (e) {}
+        log("Connected as " + cid);
+        discoverLoaded = false;
+        playlistsLoaded = false;
+        checkAuthStatus();
+        syncInitialPlaybackState();
+        startEventLongPoll();
+      }
+
+      document.getElementById("btn-save-token").onclick = doConnect;
+      tokenInput.onkeydown = function (e) {
+        var ev = e || window.event;
+        if (ev && ev.keyCode === 13) doConnect();
+      };
+      document.getElementById("btn-check-auth").onclick = checkAuthStatus;
+
+      document.getElementById("btn-qr-start").onclick = function () {
+        if (qrPollTimer) { clearTimeout(qrPollTimer); qrPollTimer = null; }
+        apiRequest("POST", "/api/v1/auth/qr/start", {}, function (status, data) {
+          if (status !== 200 || !data) {
+            log("Failed to start QR login (" + status + ")");
+            return;
+          }
+          qrContainer.style.display = "block";
+          qrSvgWrap.innerHTML = data.qr_svg;
+          setText(qrPollMsg, "等待扫码...");
+          qrPollTimer = setTimeout(function () { pollQrOnce(data.unikey); }, 2000);
+        });
+      };
+
+      function doSearch() {
+        var q = trimStr(searchInput.value);
+        if (!q) return;
+        setText(searchSummary, "搜索中...");
+        apiRequest("GET", "/api/v1/search?q=" + encodeURIComponent(q) + "&limit=30", null, function (status, data) {
+          if (status !== 200 || !data || !data.tracks) {
+            setText(searchSummary, "搜索失败 (" + status + ")");
+            return;
+          }
+          log("Search '" + q + "' returned " + data.tracks.length + " track(s)");
+          renderSearchResults(data.tracks);
+        });
+      }
+
+      document.getElementById("btn-search").onclick = doSearch;
+      searchInput.onkeydown = function (e) {
+        var ev = e || window.event;
+        if (ev && ev.keyCode === 13) doSearch();
+      };
+
+      document.getElementById("btn-load-playlists").onclick = function () {
+        if (activePlaylistId !== null) {
+          openPlaylist(activePlaylistId, activePlaylistName, true);
+        } else {
+          loadUserPlaylists(true);
+        }
+      };
+
+      playlistSelect.onchange = function () {
+        var val = parseInt(playlistSelect.value, 10);
+        if (!val) return;
+        var name = "";
+        for (var i = 0; i < loadedPlaylists.length; i++) {
+          if (loadedPlaylists[i].id === val) {
+            name = loadedPlaylists[i].name;
+            break;
+          }
+        }
+        openPlaylist(val, name, false);
+      };
+
+      playlistFilter.onkeyup = applyPlaylistFilter;
+      playlistFilter.onchange = applyPlaylistFilter;
+      document.getElementById("btn-clear-filter").onclick = function () {
+        playlistFilter.value = "";
+        applyPlaylistFilter();
+      };
+      document.getElementById("btn-play-playlist").onclick = function () {
+        replaceQueueAndPlay(filteredPlaylistSongs, 0, activePlaylistName || "歌单");
+      };
+      document.getElementById("btn-queue-page").onclick = function () {
+        var start = playlistPage * PAGE_SIZE;
+        var end = Math.min(start + PAGE_SIZE, filteredPlaylistSongs.length);
+        for (var i = start; i < end; i++) {
+          queue.push(filteredPlaylistSongs[i]);
+        }
+        renderQueue();
+        log("Added " + (end - start) + " track(s) to queue");
+      };
+
+      function stepPlaylistPage(delta) {
+        playlistPage += delta;
+        renderPlaylistPage();
+      }
+      document.getElementById("btn-pl-prev-top").onclick = function () { stepPlaylistPage(-1); };
+      document.getElementById("btn-pl-next-top").onclick = function () { stepPlaylistPage(1); };
+      document.getElementById("btn-pl-prev-bot").onclick = function () {
+        stepPlaylistPage(-1);
+        window.scrollTo(0, 0);
+      };
+      document.getElementById("btn-pl-next-bot").onclick = function () {
+        stepPlaylistPage(1);
+        window.scrollTo(0, 0);
+      };
+
+      document.getElementById("btn-q-prev").onclick = function () { queuePage -= 1; renderQueue(); };
+      document.getElementById("btn-q-next").onclick = function () { queuePage += 1; renderQueue(); };
+      document.getElementById("btn-clear-queue").onclick = function () {
+        queue = [];
+        queueIndex = -1;
+        queuePage = 0;
+        renderQueue();
+      };
+
+      function togglePlayPause() {
+        if (!isOwner || !player.src || player.src === "" || player.src === window.location.href) {
+          if (queue.length > 0) {
+            playQueueIndex(queueIndex >= 0 ? queueIndex : 0, false);
+          } else if (discoverSongs.length > 0) {
+            replaceQueueAndPlay(discoverSongs, 0, discoverContextLabel);
+          } else if (filteredPlaylistSongs.length > 0) {
+            replaceQueueAndPlay(filteredPlaylistSongs, 0, activePlaylistName || "歌单");
+          }
+          return;
+        }
+        if (player.paused) {
+          sendPlaybackCommand("resume", null);
+        } else {
+          sendPlaybackCommand("pause", null);
+        }
+      }
+
+      function stepTrack(delta) {
+        if (queue.length === 0) return;
+        var targetIdx = (queueIndex + delta) % queue.length;
+        if (targetIdx < 0) targetIdx += queue.length;
+        playQueueIndex(targetIdx, false);
+      }
+
+      function handleSeekBarChange(barEl) {
+        isSeeking = false;
+        var rawPct = parseFloat(barEl.value) || 0;
+        syncNpSeekVisual(rawPct);
+        if (player.duration) {
+          var target = (rawPct / 100) * player.duration;
+          player.currentTime = target;
+          if (seekBar) seekBar.value = barEl.value;
+          if (npSeekBar) npSeekBar.value = barEl.value;
+          if (isOwner) sendPlaybackCommand("seek", null, target);
+        }
+      }
+
+      function heartCurrentTrack() {
+        if (currentTrackObj && currentTrackObj.id) {
+          toggleLikeSong(currentTrackObj.id);
+        }
+      }
+
+      btnMiniHeart.onclick = heartCurrentTrack;
+      if (btnNpHeart) btnNpHeart.onclick = heartCurrentTrack;
+
+      btnPlayPause.onclick = togglePlayPause;
+      if (btnNpPlayPause) btnNpPlayPause.onclick = togglePlayPause;
+
+      document.getElementById("btn-stop").onclick = function () {
+        if (isOwner) {
+          sendPlaybackCommand("stop", null);
+        } else {
+          dropLocalMediaAndReset("STOPPED", currentGen);
+        }
+      };
+
+      document.getElementById("btn-prev").onclick = function () { stepTrack(-1); };
+      document.getElementById("btn-next").onclick = function () { stepTrack(1); };
+      document.getElementById("btn-np-prev").onclick = function () { stepTrack(-1); };
+      document.getElementById("btn-np-next").onclick = function () { stepTrack(1); };
+
+      seekBar.onmousedown = function () { isSeeking = true; };
+      seekBar.ontouchstart = function () { isSeeking = true; };
+      seekBar.onblur = function () { isSeeking = false; };
+      seekBar.onchange = function () { handleSeekBarChange(seekBar); };
+
+      if (npSeekBar) {
+        npSeekBar.onmousedown = function () { isSeeking = true; };
+        npSeekBar.ontouchstart = function () { isSeeking = true; };
+        npSeekBar.onblur = function () { isSeeking = false; };
+        npSeekBar.oninput = function () {
+          syncNpSeekVisual(parseFloat(npSeekBar.value) || 0);
+        };
+        npSeekBar.onchange = function () { handleSeekBarChange(npSeekBar); };
+      }
+
+      qualitySelect.onchange = function () {
+        syncQualityUi();
+      };
+
+      if (btnNpQuality && npQualityGroup) {
+        var supportsFocusGroup = typeof HTMLElement !== "undefined" && ("focusGroup" in HTMLElement.prototype);
+        if (!supportsFocusGroup) {
+          npQualityGroup.setAttribute("role", "menu");
+        }
+        btnNpQuality.onclick = function (e) {
+          if (e && e.stopPropagation) e.stopPropagation();
+          if (isQualityMenuOpen()) {
+            closeQualityMenu(false);
+          } else {
+            openQualityMenu(false);
+          }
+        };
+        btnNpQuality.onkeydown = function (e) {
+          var ev = e || window.event;
+          if (ev && ev.keyCode === 40) {
+            if (ev.preventDefault) ev.preventDefault();
+            openQualityMenu(true);
+          }
+        };
+
+        var qItems = npQualityGroup.getElementsByTagName("button");
+        for (var qi = 0; qi < qItems.length; qi++) {
+          (function (itemBtn, itemIdx) {
+            itemBtn.onclick = function (e) {
+              if (e && e.stopPropagation) e.stopPropagation();
+              var nextQ = itemBtn.getAttribute("data-quality") || "standard";
+              qualitySelect.value = nextQ;
+              syncQualityUi();
+              closeQualityMenu(true);
+              log("Audio quality set to " + nextQ);
+            };
+            if (!supportsFocusGroup) {
+              itemBtn.onkeydown = function (e) {
+                var ev = e || window.event;
+                if (!ev) return;
+                var code = ev.keyCode;
+                if (code === 27) {
+                  if (ev.stopPropagation) ev.stopPropagation();
+                  closeQualityMenu(true);
+                  return;
+                }
+                var targetIdx = -1;
+                if (code === 40) targetIdx = (itemIdx + 1) % qItems.length;
+                else if (code === 38) targetIdx = (itemIdx - 1 + qItems.length) % qItems.length;
+                else if (code === 36) targetIdx = 0;
+                else if (code === 35) targetIdx = qItems.length - 1;
+                if (targetIdx !== -1) {
+                  if (ev.preventDefault) ev.preventDefault();
+                  if (qItems[targetIdx].focus) qItems[targetIdx].focus();
+                }
+              };
+            }
+          })(qItems[qi], qi);
+        }
+
+        if (document.addEventListener) {
+          document.addEventListener("click", function (e) {
+            if (!isQualityMenuOpen()) return;
+            var t = e && e.target;
+            if (t !== btnNpQuality && (!npQualityMenu.contains || !npQualityMenu.contains(t))) {
+              closeQualityMenu(false);
+            }
+          }, false);
+        }
+      }
+
+      chkAutoNext.onchange = syncAutoBtnUi;
+      if (btnNpAuto) {
+        btnNpAuto.onclick = function () {
+          chkAutoNext.checked = !chkAutoNext.checked;
+          syncAutoBtnUi();
+        };
+      }
+
+      document.getElementById("btn-open-now-playing").onclick = openNowPlaying;
+      if (btnNpClose) btnNpClose.onclick = closeNowPlaying;
+      document.getElementById("btn-np-heart-mode").onclick = loadHeartMode;
+      document.getElementById("btn-np-queue").onclick = function () {
+        closeNowPlaying();
+        showTab("queue");
+      };
+
+      if (npDialog && typeof npDialog.showModal !== "function" && document.addEventListener) {
+        // Fallback Esc dismissal only when native <dialog>.showModal() is absent (e.g., BB10 WebKit).
+        document.addEventListener("keydown", function (e) {
+          var ev = e || window.event;
+          if (ev && ev.keyCode === 27 && isNowPlayingOpen()) {
+            closeNowPlaying();
+          }
+        }, false);
+      }
+
+      document.getElementById("btn-clear-log").onclick = function () { logBox.innerHTML = ""; };
+
+      player.addEventListener("play", function () {
+        updatePlayButtonVisual(true);
+        if (isOwner) {
+          updateOwnershipUi(true, currentGen, "PLAYING", "OWNER");
+        }
+      }, false);
+
+      player.addEventListener("playing", function () {
+        consecutiveAudioErrors = 0;
+      }, false);
+
+      player.addEventListener("pause", function () {
+        updatePlayButtonVisual(false);
+        if (isOwner) {
+          updateOwnershipUi(true, currentGen, "PAUSED", "OWNER");
+        }
+      }, false);
+
+      player.addEventListener("timeupdate", function () {
+        if (!isSeeking && player.duration) {
+          var pct = (player.currentTime / player.duration) * 100;
+          seekBar.value = pct;
+          if (npSeekBar) npSeekBar.value = pct;
+          syncNpSeekVisual(pct);
+        }
+        var curStr = formatTime(player.currentTime);
+        var durStr = formatTime(player.duration);
+        setText(timeDisplay, curStr + " / " + durStr);
+        if (npCurTime) setText(npCurTime, curStr);
+        if (npDurTime) setText(npDurTime, durStr);
+      }, false);
+
+      player.addEventListener("ended", function () {
+        if (chkAutoNext.checked && isOwner && queue.length > 0) {
+          var next = (queueIndex + 1) % queue.length;
+          log("Track ended; requesting Auto-Next for gen=" + currentGen);
+          playQueueIndex(next, true);
+        }
+      }, false);
+
+      player.addEventListener("error", function () {
+        if (!isOwner || !player.getAttribute("src")) return;
+        var code = player.error ? player.error.code : "unknown";
+        if (chkAutoNext.checked && queue.length > 1 && consecutiveAudioErrors < 3) {
+          consecutiveAudioErrors += 1;
+          log("Audio error code=" + code + "; skipping to next track in 1.5s (" + consecutiveAudioErrors + "/3)");
+          clearErrorSkipTimer();
+          errorSkipTimer = setTimeout(function () {
+            errorSkipTimer = null;
+            if (isOwner && queue.length > 1) {
+              var next = (queueIndex + 1) % queue.length;
+              playQueueIndex(next, true);
+            }
+          }, 1500);
+        } else {
+          log("Audio error code=" + code + (consecutiveAudioErrors >= 3 ? " (auto-skip limit reached)" : ""));
+        }
+      }, false);
+
+      function onForegroundSync() {
+        if (!trimStr(tokenInput.value)) return;
+        syncInitialPlaybackState();
+        if (!eventPollActive) {
+          startEventLongPoll();
+        } else if (!activeEventXhr) {
+          pollNextEvent();
+        }
+      }
+      if (window.addEventListener) {
+        window.addEventListener("focus", onForegroundSync, false);
+      }
+      if (document.addEventListener) {
+        document.addEventListener("visibilitychange", function () {
+          if (!document.hidden) onForegroundSync();
+        }, false);
+      }
+
+      syncQualityUi();
+      syncNpSeekVisual(0);
+      syncAutoBtnUi();
+      initIdentity();
+      if (trimStr(tokenInput.value)) {
+        checkAuthStatus();
+        syncInitialPlaybackState();
+        startEventLongPoll();
+      }
+      log("Player initialized for " + clientIdInput.value);
+    })();
+  </script>
+</body>
+</html>

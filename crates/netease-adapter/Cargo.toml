@@ -1,0 +1,24 @@
+[package]
+name = "netease-adapter"
+version.workspace = true
+edition.workspace = true
+license = "GPL-3.0-only"
+description = "NetEase Cloud Music adapter wrapping pinned netease-cloud-music-api 2.1.0 with durable private cookies, proxy config, and error classification."
+
+[dependencies]
+anyhow.workspace = true
+futures-lite = "2"
+isahc = { version = "2.0.2", features = ["cookies"] }
+ncm-api = { git = "https://github.com/gmg137/netease-cloud-music-api.git", rev = "32b4043e83e6ec58543ef04fc1183a3ee496719f", package = "netease-cloud-music-api" }
+openssl = { version = "0.10", features = ["vendored"] }
+provider-model = { path = "../provider-model" }
+qrcode = "0.14"
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+url.workspace = true
+
+[dev-dependencies]
+tempfile = "3"

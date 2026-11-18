@@ -1,0 +1,39 @@
+tls:
+  certificates:
+    - certFile: /certs/server.crt
+      keyFile: /certs/server.key
+
+http:
+  routers:
+    gateway-tls:
+      rule: "PathPrefix(`/`)"
+      entryPoints:
+        - websecure
+      tls: {}
+      middlewares:
+        - gateway-sablier
+      service: gateway
+
+    gateway-lan:
+      rule: "PathPrefix(`/`)"
+      entryPoints:
+        - web
+      middlewares:
+        - gateway-sablier
+      service: gateway
+
+  middlewares:
+    gateway-sablier:
+      plugin:
+        sablier:
+          sablierUrl: "http://sablier:10000"
+          group: "bb10-music163"
+          sessionDuration: "10m"
+          blocking:
+            timeout: "30s"
+
+  services:
+    gateway:
+      loadBalancer:
+        servers:
+          - url: "http://bb10-music163-gateway:8090"

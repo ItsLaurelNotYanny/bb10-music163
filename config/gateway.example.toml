@@ -1,0 +1,21 @@
+# Example configuration for bb10-music163 gateway.
+# Copy to config/gateway.toml (ignored by VCS) and replace placeholders before running.
+
+[server]
+# Local listen socket for gateway REST/UI access.
+listen = "127.0.0.1:8090"
+# Gateway Bearer token protecting /api/v1/* endpoints (separate from NetEase cookies).
+# Generate a strong random token, e.g.: openssl rand -hex 32
+gateway_token = "replace-with-strong-gateway-token"
+
+[proxy]
+# SOCKS5 with remote DNS (`socks5h://`) targeting your SOCKS5 proxy on port 1080.
+api_proxy = "socks5h://127.0.0.1:1080"
+# Separate media proxy setting to support future split routing without protocol changes.
+media_proxy = "socks5h://127.0.0.1:1080"
+# Must remain true; TLS peer and hostname validation cannot be disabled.
+tls_verify = true
+
+[state]
+# Private directory storing netease_cookies.json (0600) and secret-free session_events.jsonl.
+state_dir = "./state"

@@ -1,0 +1,8 @@
+target/
+state/
+fixtures/
+.git/
+docs/
+tests/
+config/gateway.toml
+.env

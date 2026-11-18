@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=2.0, user-scalable=yes">
+  <title>BB10 Music163 - M0 Feasibility Test</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #121212;
+      color: #eeeeee;
+      padding: 12px;
+      line-height: 1.4;
+      font-size: 14px;
+    }
+    h1 { font-size: 18px; margin-bottom: 8px; color: #4caf50; }
+    h2 { font-size: 15px; margin: 12px 0 6px 0; color: #81c784; border-bottom: 1px solid #333; padding-bottom: 4px; }
+    .card {
+      background: #1e1e1e;
+      border-radius: 6px;
+      padding: 10px;
+      margin-bottom: 10px;
+      border: 1px solid #2d2d2d;
+    }
+    .status-row { display: flex; justify-content: space-between; margin-bottom: 6px; }
+    .status-label { color: #888; font-weight: bold; }
+    .status-val { font-family: monospace; font-size: 13px; color: #fff; }
+    .btn-group { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+    button {
+      background: #2e7d32;
+      color: #fff;
+      border: none;
+      padding: 10px 14px;
+      border-radius: 4px;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+      min-width: 60px;
+    }
+    button:active { background: #1b5e20; }
+    button.btn-warn { background: #d32f2f; }
+    button.btn-warn:active { background: #9a0007; }
+    button.btn-secondary { background: #424242; }
+    button.btn-secondary:active { background: #616161; }
+    button.btn-nav { background: #1565c0; }
+    button.btn-nav:active { background: #0d47a1; }
+    .seek-container { margin: 10px 0; }
+    input[type=range] {
+      width: 100%;
+      height: 28px;
+      margin: 4px 0;
+    }
+    .track-list { list-style: none; margin: 6px 0; }
+    .track-item {
+      padding: 8px;
+      margin-bottom: 4px;
+      background: #252525;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      border-left: 4px solid transparent;
+    }
+    .track-item.active {
+      background: #2e3a2e;
+      border-left-color: #4caf50;
+      font-weight: bold;
+    }
+    .log-box {
+      background: #000;
+      color: #0f0;
+      font-family: monospace;
+      font-size: 11px;
+      height: 140px;
+      overflow-y: scroll;
+      padding: 6px;
+      border-radius: 4px;
+      border: 1px solid #333;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .metric-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      font-size: 12px;
+    }
+    .metric-item {
+      background: #252525;
+      padding: 6px;
+      border-radius: 4px;
+    }
+    .metric-item .num {
+      font-size: 16px;
+      font-weight: bold;
+      color: #ffb74d;
+      font-family: monospace;
+    }
+    .auth-input-group {
+      display: flex;
+      gap: 6px;
+      margin-top: 6px;
+    }
+    input[type=text] {
+      flex: 1;
+      background: #252525;
+      color: #fff;
+      border: 1px solid #444;
+      padding: 8px;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+    .checklist { list-style: none; font-size: 12px; }
+    .checklist li { margin: 4px 0; display: flex; align-items: center; }
+    .checklist input[type=checkbox] { margin-right: 8px; width: 16px; height: 16px; }
+  </style>
+</head>
+<body>
+
+  <h1>BB10 Feasibility Harness (M0)</h1>
+
+  <!-- Player Status Card -->
+  <div class="card">
+    <div class="status-row">
+      <span class="status-label">Now Playing:</span>
+      <span id="cur-track" class="status-val">(None)</span>
+    </div>
+    <div class="status-row">
+      <span class="status-label">State:</span>
+      <span id="play-state" class="status-val">STOPPED</span>
+    </div>
+    <div class="status-row">
+      <span class="status-label">Position:</span>
+      <span id="time-display" class="status-val">00:00 / 00:00</span>
+    </div>
+
+    <!-- Seek slider -->
+    <div class="seek-container">
+      <input type="range" id="seek-bar" min="0" max="100" value="0" step="0.1">
+    </div>
+
+    <!-- Playback buttons -->
+    <div class="btn-group">
+      <button id="btn-play-pause">Play</button>
+      <button id="btn-stop" class="btn-warn">Stop</button>
+      <button id="btn-prev" class="btn-nav">&laquo; Prev</button>
+      <button id="btn-next" class="btn-nav">Next &raquo;</button>
+    </div>
+
+    <!-- Quick Seek Buttons -->
+    <div class="btn-group">
+      <button id="btn-rewind" class="btn-secondary">-10s</button>
+      <button id="btn-forward" class="btn-secondary">+10s</button>
+      <button id="btn-seek-25" class="btn-secondary">25%</button>
+      <button id="btn-seek-50" class="btn-secondary">50%</button>
+      <button id="btn-seek-75" class="btn-secondary">75%</button>
+    </div>
+  </div>
+
+  <!-- Acceptance Metrics Card -->
+  <div class="card">
+    <h2>M0 Acceptance Metrics</h2>
+    <div class="metric-grid">
+      <div class="metric-item">
+        <div>Auto Transitions:</div>
+        <div id="stat-transitions" class="num">0</div>
+        <div style="color:#888; font-size:10px;">Target: &ge; 3 transitions</div>
+      </div>
+      <div class="metric-item">
+        <div>Continuous Play:</div>
+        <div id="stat-continuous" class="num">00:00</div>
+        <div style="color:#888; font-size:10px;">Target: &ge; 30 min</div>
+      </div>
+      <div class="metric-item">
+        <div>Background/Lock Time:</div>
+        <div id="stat-locked-time" class="num">00:00</div>
+        <div style="color:#888; font-size:10px;">Target: &ge; 10 min locked</div>
+      </div>
+      <div class="metric-item">
+        <div>Visibility State:</div>
+        <div id="stat-vis-state" class="num" style="font-size:13px; color:#4fc3f7;">visible</div>
+        <div style="color:#888; font-size:10px;">Screen lock detector</div>
+      </div>
+    </div>
+    <div style="margin-top:8px;">
+      <label style="cursor:pointer;">
+        <input type="checkbox" id="chk-auto-advance" checked>
+        <b>Enable Auto-advance (advance to next track on 'ended')</b>
+      </label>
+    </div>
+  </div>
+
+  <!-- Track Selection Card -->
+  <div class="card">
+    <h2>Playlist (Synthetic Fixtures)</h2>
+    <ul class="track-list" id="track-list"></ul>
+  </div>
+
+  <!-- Media Authentication Card -->
+  <div class="card">
+    <h2>Media Ticket Authentication</h2>
+    <div style="font-size:12px; color:#aaa;">Validates protected media URL tickets:</div>
+    <div class="auth-input-group">
+      <input type="text" id="ticket-input" value="bb10-test-ticket" placeholder="Media ticket">
+      <button id="btn-apply-ticket" class="btn-secondary">Apply</button>
+    </div>
+  </div>
+
+  <!-- Device Diagnostics Card -->
+  <div class="card">
+    <h2>Device & Environment Info</h2>
+    <div class="status-row">
+      <span class="status-label">Screen:</span>
+      <span id="diag-screen" class="status-val">-</span>
+    </div>
+    <div class="status-row">
+      <span class="status-label">MP3 Support:</span>
+      <span id="diag-mp3" class="status-val">-</span>
+    </div>
+    <div class="status-row">
+      <span class="status-label">AAC Support:</span>
+      <span id="diag-aac" class="status-val">-</span>
+    </div>
+    <div class="status-row" style="flex-direction:column; align-items:flex-start;">
+      <span class="status-label">User Agent:</span>
+      <span id="diag-ua" class="status-val" style="word-break:break-all; font-size:11px; margin-top:2px;">-</span>
+    </div>
+  </div>
+
+  <!-- Event Log Card -->
+  <div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+      <h2>Event Log</h2>
+      <button id="btn-clear-log" class="btn-secondary" style="padding:4px 8px; font-size:11px;">Clear</button>
+    </div>
+    <div id="log-box" class="log-box"></div>
+  </div>
+
+  <!-- On-Screen Acceptance Checklist -->
+  <div class="card">
+    <h2>Passport Verification Checklist</h2>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> 1. Audible sound output verified on device speakers/headphones</label></li>
+      <li><label><input type="checkbox"> 2. Play / Pause responsiveness verified</label></li>
+      <li><label><input type="checkbox"> 3. Seek forwards/backwards and slider scrubbing verified</label></li>
+      <li><label><input type="checkbox"> 4. At least 3 automatic track transitions occurred without touch</label></li>
+      <li><label><input type="checkbox"> 5. Audio continues playing when switching to another BB10 app</label></li>
+      <li><label><input type="checkbox"> 6. Audio continues playing for &ge; 10 min while phone is locked</label></li>
+      <li><label><input type="checkbox"> 7. 30 minutes continuous run completed on 30min endurance track</label></li>
+      <li><label><input type="checkbox"> 8. Foreground and background Stop command halts audio immediately</label></li>
+      <li><label><input type="checkbox"> 9. Authentication ticket rejection/acceptance verified</label></li>
+    </ul>
+  </div>
+
+  <!-- Hidden native HTML5 Audio element -->
+  <audio id="audio-player" preload="auto"></audio>
+
+  <!-- Strictly ES5 Script -->
+  <script>
+    (function () {
+      // Strict ES5 - no const, let, arrow functions, or template strings.
+      var tracks = [
+        { id: 1, name: "Track 1: 440 Hz (A4) - 5s", file: "track1_440hz.mp3", duration: 5 },
+        { id: 2, name: "Track 2: 554 Hz (C#5) - 5s", file: "track2_554hz.mp3", duration: 5 },
+        { id: 3, name: "Track 3: 659 Hz (E5) - 5s", file: "track3_659hz.mp3", duration: 5 },
+        { id: 4, name: "Track 4: 880 Hz (A5) - 5s", file: "track4_880hz.mp3", duration: 5 },
+        { id: 5, name: "Track 5: 440 Hz 30-Min Endurance", file: "track_long_30min.mp3", duration: 1800 }
+      ];
+
+      var currentIndex = 0;
+      var autoTransitionsCount = 0;
+      var continuousPlaySeconds = 0;
+      var backgroundSeconds = 0;
+      var continuousTimer = null;
+      var backgroundTimer = null;
+      var isSeeking = false;
+      var lastLoggedTime = -1;
+
+      var player = document.getElementById("audio-player");
+      var btnPlayPause = document.getElementById("btn-play-pause");
+      var btnStop = document.getElementById("btn-stop");
+      var btnPrev = document.getElementById("btn-prev");
+      var btnNext = document.getElementById("btn-next");
+      var btnRewind = document.getElementById("btn-rewind");
+      var btnForward = document.getElementById("btn-forward");
+      var btnSeek25 = document.getElementById("btn-seek-25");
+      var btnSeek50 = document.getElementById("btn-seek-50");
+      var btnSeek75 = document.getElementById("btn-seek-75");
+      var seekBar = document.getElementById("seek-bar");
+      var curTrackSpan = document.getElementById("cur-track");
+      var playStateSpan = document.getElementById("play-state");
+      var timeDisplay = document.getElementById("time-display");
+      var statTransitions = document.getElementById("stat-transitions");
+      var statContinuous = document.getElementById("stat-continuous");
+      var statLockedTime = document.getElementById("stat-locked-time");
+      var statVisState = document.getElementById("stat-vis-state");
+      var chkAutoAdvance = document.getElementById("chk-auto-advance");
+      var ticketInput = document.getElementById("ticket-input");
+      var btnApplyTicket = document.getElementById("btn-apply-ticket");
+      var trackListEl = document.getElementById("track-list");
+      var logBox = document.getElementById("log-box");
+      var btnClearLog = document.getElementById("btn-clear-log");
+
+      // Extract ticket from URL parameter if present
+      function getQueryParam(name) {
+        var query = window.location.search.substring(1);
+        var pairs = query.split("&");
+        for (var i = 0; i < pairs.length; i++) {
+          var pair = pairs[i].split("=");
+          if (decodeURIComponent(pair[0]) === name) {
+            return decodeURIComponent(pair[1] || "");
+          }
+        }
+        return null;
+      }
+
+      var initialTicket = getQueryParam("ticket");
+      if (initialTicket) {
+        ticketInput.value = initialTicket;
+      }
+
+      function log(msg) {
+        var d = new Date();
+        var h = String(d.getHours()); if (h.length < 2) h = "0" + h;
+        var m = String(d.getMinutes()); if (m.length < 2) m = "0" + m;
+        var s = String(d.getSeconds()); if (s.length < 2) s = "0" + s;
+        var ms = String(d.getMilliseconds()); while (ms.length < 3) ms = "0" + ms;
+        var timestamp = "[" + h + ":" + m + ":" + s + "." + ms + "] ";
+        logBox.innerHTML += timestamp + msg + "\n";
+        logBox.scrollTop = logBox.scrollHeight;
+      }
+
+      function formatTime(sec) {
+        if (isNaN(sec) || sec < 0) sec = 0;
+        var m = Math.floor(sec / 60);
+        var s = Math.floor(sec % 60);
+        var mStr = (m < 10 ? "0" : "") + m;
+        var sStr = (s < 10 ? "0" : "") + s;
+        return mStr + ":" + sStr;
+      }
+
+      function getAudioUrl(filename) {
+        var ticket = ticketInput.value.replace(/^\s+|\s+$/g, "");
+        var url = "/audio/" + filename;
+        if (ticket.length > 0) {
+          url += "?ticket=" + encodeURIComponent(ticket);
+        }
+        return url;
+      }
+
+      function renderPlaylist() {
+        trackListEl.innerHTML = "";
+        for (var i = 0; i < tracks.length; i++) {
+          var li = document.createElement("li");
+          li.className = "track-item" + (i === currentIndex ? " active" : "");
+          li.setAttribute("data-index", i);
+
+          var spanName = document.createElement("span");
+          spanName.appendChild(document.createTextNode(tracks[i].name));
+
+          var spanDur = document.createElement("span");
+          spanDur.style.color = "#888";
+          spanDur.appendChild(document.createTextNode(formatTime(tracks[i].duration)));
+
+          li.appendChild(spanName);
+          li.appendChild(spanDur);
+
+          li.onclick = (function (idx) {
+            return function () {
+              selectTrack(idx, true);
+            };
+          })(i);
+
+          trackListEl.appendChild(li);
+        }
+      }
+
+      function selectTrack(index, autoPlay) {
+        if (index < 0 || index >= tracks.length) return;
+        currentIndex = index;
+        renderPlaylist();
+
+        var track = tracks[currentIndex];
+        curTrackSpan.innerHTML = track.name;
+        var url = getAudioUrl(track.file);
+        log("Loading track: " + track.name + " (" + url + ")");
+
+        player.src = url;
+        player.load();
+        seekBar.value = 0;
+        timeDisplay.innerHTML = "00:00 / " + formatTime(track.duration);
+
+        if (autoPlay) {
+          player.play();
+        }
+      }
+
+      function startContinuousTimer() {
+        if (continuousTimer) return;
+        continuousTimer = setInterval(function () {
+          continuousPlaySeconds++;
+          statContinuous.innerHTML = formatTime(continuousPlaySeconds);
+        }, 1000);
+      }
+
+      function stopContinuousTimer() {
+        if (continuousTimer) {
+          clearInterval(continuousTimer);
+          continuousTimer = null;
+        }
+      }
+
+      // Play / Pause button
+      btnPlayPause.onclick = function () {
+        if (!player.src || player.src === "" || player.src === window.location.href) {
+          selectTrack(currentIndex, true);
+          return;
+        }
+        if (player.paused) {
+          player.play();
+        } else {
+          player.pause();
+        }
+      };
+
+      // Stop button - complete reset & release of audio resources
+      btnStop.onclick = function () {
+        log("STOP command triggered - pausing and clearing media element");
+        player.pause();
+        player.currentTime = 0;
+        player.removeAttribute("src");
+        player.load();
+        playStateSpan.innerHTML = "STOPPED";
+        btnPlayPause.innerHTML = "Play";
+        stopContinuousTimer();
+        continuousPlaySeconds = 0;
+        statContinuous.innerHTML = "00:00";
+        seekBar.value = 0;
+        timeDisplay.innerHTML = "00:00 / 00:00";
+        log("Media stopped and buffer dropped");
+      };
+
+      // Previous / Next buttons
+      btnPrev.onclick = function () {
+        var newIndex = currentIndex - 1;
+        if (newIndex < 0) newIndex = tracks.length - 1;
+        selectTrack(newIndex, true);
+      };
+
+      btnNext.onclick = function () {
+        var newIndex = (currentIndex + 1) % tracks.length;
+        selectTrack(newIndex, true);
+      };
+
+      // Seek buttons
+      btnRewind.onclick = function () {
+        if (player.currentTime > 10) {
+          player.currentTime -= 10;
+        } else {
+          player.currentTime = 0;
+        }
+        log("Seek -10s to " + formatTime(player.currentTime));
+      };
+
+      btnForward.onclick = function () {
+        if (player.duration) {
+          var target = Math.min(player.duration, player.currentTime + 10);
+          player.currentTime = target;
+          log("Seek +10s to " + formatTime(target));
+        }
+      };
+
+      function seekToPercent(pct) {
+        if (player.duration && player.duration > 0) {
+          var target = player.duration * pct;
+          player.currentTime = target;
+          log("Seek to " + Math.round(pct * 100) + "% (" + formatTime(target) + ")");
+        }
+      }
+
+      btnSeek25.onclick = function () { seekToPercent(0.25); };
+      btnSeek50.onclick = function () { seekToPercent(0.50); };
+      btnSeek75.onclick = function () { seekToPercent(0.75); };
+
+      // Seek bar scrubbing
+      seekBar.onmousedown = function () { isSeeking = true; };
+      seekBar.ontouchstart = function () { isSeeking = true; };
+      seekBar.onmouseup = function () {
+        isSeeking = false;
+        if (player.duration) {
+          player.currentTime = (seekBar.value / 100) * player.duration;
+        }
+      };
+      seekBar.ontouchend = function () {
+        isSeeking = false;
+        if (player.duration) {
+          player.currentTime = (seekBar.value / 100) * player.duration;
+        }
+      };
+      seekBar.onchange = function () {
+        if (player.duration) {
+          player.currentTime = (seekBar.value / 100) * player.duration;
+          log("Slider seek to " + formatTime(player.currentTime));
+        }
+      };
+
+      // Ticket update
+      btnApplyTicket.onclick = function () {
+        log("Applying media ticket: " + ticketInput.value);
+        if (player.src && player.src !== "") {
+          var isPlaying = !player.paused;
+          selectTrack(currentIndex, isPlaying);
+        }
+      };
+
+      btnClearLog.onclick = function () {
+        logBox.innerHTML = "";
+      };
+
+      // Audio element event listeners
+      player.addEventListener("loadstart", function () {
+        log("Event: loadstart");
+      }, false);
+
+      player.addEventListener("canplay", function () {
+        log("Event: canplay (duration: " + formatTime(player.duration) + ")");
+      }, false);
+
+      player.addEventListener("play", function () {
+        log("Event: play");
+        playStateSpan.innerHTML = "PLAYING";
+        btnPlayPause.innerHTML = "Pause";
+        startContinuousTimer();
+      }, false);
+
+      player.addEventListener("playing", function () {
+        log("Event: playing (audible stream active)");
+      }, false);
+
+      player.addEventListener("pause", function () {
+        log("Event: pause (at " + formatTime(player.currentTime) + ")");
+        playStateSpan.innerHTML = "PAUSED";
+        btnPlayPause.innerHTML = "Play";
+        stopContinuousTimer();
+      }, false);
+
+      player.addEventListener("seeking", function () {
+        log("Event: seeking (to " + formatTime(player.currentTime) + ")");
+      }, false);
+
+      player.addEventListener("seeked", function () {
+        log("Event: seeked (at " + formatTime(player.currentTime) + ")");
+      }, false);
+
+      player.addEventListener("waiting", function () {
+        log("Event: waiting (buffering data)");
+      }, false);
+
+      player.addEventListener("stalled", function () {
+        log("Event: stalled (network data stalled)");
+      }, false);
+
+      player.addEventListener("error", function () {
+        var errCode = player.error ? player.error.code : "unknown";
+        var errMsg = player.error ? player.error.message : "";
+        log("ERROR: Audio error code=" + errCode + " " + errMsg);
+        playStateSpan.innerHTML = "ERROR (" + errCode + ")";
+        btnPlayPause.innerHTML = "Play";
+        stopContinuousTimer();
+      }, false);
+
+      player.addEventListener("timeupdate", function () {
+        if (!isSeeking && player.duration) {
+          var pct = (player.currentTime / player.duration) * 100;
+          seekBar.value = pct;
+        }
+        timeDisplay.innerHTML = formatTime(player.currentTime) + " / " + formatTime(player.duration);
+
+        // Throttle timeupdate logs to every 10 seconds
+        var curSec = Math.floor(player.currentTime);
+        if (curSec % 10 === 0 && curSec !== lastLoggedTime) {
+          lastLoggedTime = curSec;
+          log("Progress: " + formatTime(player.currentTime) + " / " + formatTime(player.duration));
+        }
+      }, false);
+
+      // Automatic next track on 'ended'
+      player.addEventListener("ended", function () {
+        log("Event: ended for track " + (currentIndex + 1));
+        if (chkAutoAdvance.checked) {
+          autoTransitionsCount++;
+          statTransitions.innerHTML = String(autoTransitionsCount);
+          log("Auto-advancing to next track (Transition #" + autoTransitionsCount + ")");
+          var nextIdx = (currentIndex + 1) % tracks.length;
+          selectTrack(nextIdx, true);
+        } else {
+          playStateSpan.innerHTML = "ENDED";
+          btnPlayPause.innerHTML = "Play";
+          stopContinuousTimer();
+        }
+      }, false);
+
+      // Screen Lock and Background Detection via visibilitychange & pagehide
+      function handleVisibilityChange() {
+        var state = document.visibilityState || (document.hidden ? "hidden" : "visible");
+        statVisState.innerHTML = state;
+        log("Visibility changed to: " + state);
+
+        if (state === "hidden") {
+          // Device locked or switched app
+          log("Terminal entered background / lock state");
+          if (!backgroundTimer) {
+            backgroundTimer = setInterval(function () {
+              backgroundSeconds++;
+              statLockedTime.innerHTML = formatTime(backgroundSeconds);
+            }, 1000);
+          }
+        } else {
+          // Terminal returned to foreground
+          log("Terminal returned to foreground. Total background: " + formatTime(backgroundSeconds));
+          if (backgroundTimer) {
+            clearInterval(backgroundTimer);
+            backgroundTimer = null;
+          }
+        }
+      }
+
+      if (typeof document.hidden !== "undefined") {
+        document.addEventListener("visibilitychange", handleVisibilityChange, false);
+      } else if (typeof document.webkitHidden !== "undefined") {
+        document.addEventListener("webkitvisibilitychange", handleVisibilityChange, false);
+      }
+
+      window.addEventListener("pagehide", function () {
+        log("Event: pagehide (app switching or navigating away)");
+      }, false);
+
+      window.addEventListener("pageshow", function () {
+        log("Event: pageshow (resumed app)");
+      }, false);
+
+      // System Diagnostics
+      function runDiagnostics() {
+        document.getElementById("diag-screen").innerHTML =
+          window.screen.width + "x" + window.screen.height + " (dpr=" + (window.devicePixelRatio || 1) + ")";
+        document.getElementById("diag-ua").innerHTML = navigator.userAgent;
+
+        var dummyAudio = document.createElement("audio");
+        var mp3Check = dummyAudio.canPlayType ? dummyAudio.canPlayType("audio/mpeg") : "unsupported";
+        var aacCheck = dummyAudio.canPlayType ? dummyAudio.canPlayType('audio/mp4; codecs="mp4a.40.2"') : "unsupported";
+        document.getElementById("diag-mp3").innerHTML = mp3Check || "no";
+        document.getElementById("diag-aac").innerHTML = aacCheck || "no";
+      }
+
+      // Initial setup
+      runDiagnostics();
+      renderPlaylist();
+      curTrackSpan.innerHTML = tracks[0].name;
+      log("M0 Harness initialized. Ready for BlackBerry Passport acceptance.");
+    })();
+  </script>
+</body>
+</html>
