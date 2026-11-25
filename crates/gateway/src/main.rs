@@ -3,6 +3,7 @@
 mod backend;
 mod config;
 mod server;
+mod tls;
 
 use crate::config::GatewayConfig;
 use crate::server::{build_router, AppState};
@@ -262,9 +263,27 @@ async fn main() -> Result<()> {
                 cfg.to_relay_config(),
                 DestinationPolicy::netease_default(),
             )?);
-            let listener = tokio::net::TcpListener::bind(&cfg.server.listen)
-                .await
-                .with_context(|| format!("failed to bind {}", cfg.server.listen))?;
+
+            // Validate TLS material and bind both sockets before declaring readiness.
+            let tls_binding = match &cfg.server.tls_listen {
+                Some(tls_addr) => {
+                    let cert = cfg
+                        .server
+                        .tls_cert
+                        .as_deref()
+                        .context("missing tls_cert after validation")?;
+                    let key = cfg
+                        .server
+                        .tls_key
+                        .as_deref()
+                        .context("missing tls_key after validation")?;
+                    let rustls_cfg = tls::build_tls_config(cert, key)?;
+                    let listener = tls::bind_std_listener(tls_addr)?;
+                    Some((tls_addr.clone(), listener, rustls_cfg))
+                }
+                None => None,
+            };
+            let http_listener = tls::bind_std_listener(&cfg.server.listen)?;
 
             let state = AppState::new(
                 adapter.clone(),
@@ -276,6 +295,10 @@ async fn main() -> Result<()> {
 
             println!("Gateway HTTP server listening on {}", cfg.server.listen);
             println!("  Player UI:       http://{}/player", cfg.server.listen);
+            if let Some((ref tls_addr, _, _)) = tls_binding {
+                println!("Gateway HTTPS server listening on {tls_addr}");
+                println!("  Player UI (TLS): https://{tls_addr}/player");
+            }
             println!("  State dir:       {}", cfg.state.state_dir.display());
             println!("  Restored cookies: {}", adapter.restored_from_disk());
             println!("  Restored gen:    {restored_gen}");
@@ -283,8 +306,17 @@ async fn main() -> Result<()> {
             println!("  Media proxy:     {:?}", cfg.proxy.media_proxy);
             println!("  TLS verify:      {}", cfg.proxy.tls_verify);
 
-            let app = build_router(state);
-            axum::serve(listener, app).await?;
+            let app = build_router(state.clone());
+            let tls_listener = tls_binding.map(|(_, l, c)| (l, c));
+            tls::serve_listeners(
+                http_listener,
+                tls_listener,
+                app,
+                state,
+                tls::shutdown_signal(),
+                tls::DEFAULT_SHUTDOWN_BUDGET,
+            )
+            .await?;
         }
     }
 

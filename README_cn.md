@@ -15,7 +15,7 @@ BlackBerry 10（OS 10.3.3）早已没有可用的官方音乐客户端，系统�
 - **原生 BB10 TLS 桥接（`bb10-shell`）**：在轻量 Cascades/Qt4 `.bar` 外壳内嵌一个本地 `127.0.0.1` OpenSSL HTTP-to-HTTPS 桥接，让 BB10 自带 `WebView` 无需修改系统证书即可直连现代 HTTPS 网关，无 SSL 握手失败与证书拦截弹窗。
 - **无盘 Range 媒体中继**：对网易云下发的签名 CDN 音频直链（`MP3` / `AAC` / `FLAC`）提供 HTTP `206` 断点拖拽转发与过期链接自动刷新——不在磁盘上留存受版权保护的音频副本。
 - **升级只改 NAS 后端**：前端播放器（`web/player.html`，零构建纯 ES5）与接口修复（例如补全超过 1,000 首的“喜欢的音乐”）均托管在服务端，日常更新无需重装 `.bar`。
-- **NAS 闲置自动休眠**：配合可选的 `Traefik + Sablier` 编排，无人使用时自动停止网关容器以利 NAS 硬盘休眠，有新请求时约 1 秒按需唤醒。
+- **单容器原生 TLS 低功耗常驻**：Rust/Tokio 空闲几乎 0% CPU，在同一容器内原生提供 HTTPS（`:16380`，`rustls` + 自建 Root CA）与局域网 HTTP（`:16381`）双入口——零 Traefik / Sablier 附加容器。
 
 ## 工作原理
 
@@ -26,10 +26,7 @@ BlackBerry 10（OS 10.3.3）早已没有可用的官方音乐客户端，系统�
  [可选] VPS 四层转发 (TLS_GUARD=1) ──Tailscale──┐
       │                                              │
       ▼                                              ▼
- Traefik (:16380 HTTPS / :16381 HTTP) + Sablier ──► NAS Docker
-      │
-      ▼
- bb10-music163-gateway (Rust / Axum)
+ bb10-music163-gateway（单容器：:16380 HTTPS / :16381 HTTP）
    ├── netease-adapter ──► [可选] socks5h:// 代理 ──► 网易云 API（登录 / 歌单 / 选链）
    ├── media-relay     ──► 直连 CDN 拉流   ──► Range / 206 音频流转发
    └── playback-session ── 单播放权代际仲裁 + STOP ACK 确认
@@ -44,7 +41,7 @@ BlackBerry 10（OS 10.3.3）早已没有可用的官方音乐客户端，系统�
 | **单播放权仲裁** (`crates/playback-session`) | 跨桌面 Safari/Chrome 与 BB10 的单调递增 `generation` 状态机、`STOP ACK` 互斥确认、重启代际底线持久化 |
 | **ES5 网页播放器** (`web/player.html`) | 零构建纯 ES5 界面，兼容 BB10 WebKit 与现代浏览器：全屏黑胶转盘、音质切换菜单、每日推荐、心动模式、私人 FM、搜索、50 首分页歌单与队列 |
 | **BB10 原生外壳** (`bb10-shell`) | 全屏 Cascades Qt4 `.bar` 应用，内置 `LocalTlsBridge`、支持远程/局域网网关地址切换、定制圆角图标与 `check-bar.py` 打包校验 |
-| **NAS 休眠与中继** (`docker-compose.nas-autosleep.yml`) | `Traefik v3.3` + `Sablier` 闲置停机按需唤醒；兼容 `TLS_GUARD=1` 四层 VPS 转发 |
+| **NAS 原生 TLS 与中继** (`docker-compose.nas-tls.yml`) | 单容器原生 `rustls` HTTPS（`:16380`）+ 局域网 HTTP（`:16381`）+ 有界 `SIGTERM` 优雅退出；兼容 `TLS_GUARD=1` 四层 VPS 转发 |
 
 ## 快速开始（一步步上手）
 
@@ -69,22 +66,22 @@ cp .env.example .env
 接着构建并启动容器：
 
 ```bash
-# 方案 1：单容器 HTTP 模式（局域网最简单，默认端口 16380）
+# 方案 1：单容器 HTTP 模式（本地开发 / 局域网最简单，默认端口 16380）
 docker compose up -d --build
 
-# 方案 2：NAS 闲置自动休眠 + HTTPS 模式（Traefik 16380 HTTPS / 16381 HTTP + Sablier）
-docker compose -f docker-compose.yml -f docker-compose.nas-autosleep.yml up -d --build
+# 方案 2：单容器 NAS 原生 TLS 模式（:16380 HTTPS + :16381 局域网 HTTP）
+docker compose -f docker-compose.nas-tls.yml up -d --build
 ```
 
 检查服务是否启动成功：
 
 ```bash
-curl -fsS http://127.0.0.1:16380/health   # （若使用 Traefik 模式则为 :16381/health）
+curl -fsS http://127.0.0.1:16380/health   # （TLS 模式下为 :16381/health 及 https://127.0.0.1:16380/health）
 ```
 
 ### 首次打开网页与扫码登录（BB10 / 手机 / 电脑零安装即可用）
 
-1. 在 BlackBerry Passport 自带浏览器、Safari 或 Chrome 打开 `http://<你的NAS_IP>:16380/player`（Traefik 模式打开 `:16381/player`）。
+1. 在 BlackBerry Passport 自带浏览器、Safari 或 Chrome 打开 `http://<你的NAS_IP>:16380/player`（TLS 模式打开 `:16381/player` 或 `https://<域名>:16380/player`）。
 2. 在页面设置栏 **Token** 中粘贴上面设置的 `GATEWAY_TOKEN`，点击 **连接**。
 3. 点击 **扫码登录**，用手机上的官方「网易云音乐」App 扫一扫二维码确认登录。
 4. 登录成功后服务端会自动将 Cookie 安全持久化到卷中（`0600` 权限），后续打开页面无需重复扫码。

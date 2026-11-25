@@ -15,7 +15,7 @@ BlackBerry 10 (OS 10.3.3) has no working official music client, lacks modern TLS
 - **Native BB10 TLS bridge (`bb10-shell`)**: Bundles a local `127.0.0.1` OpenSSL HTTP-to-HTTPS bridge inside a lightweight Cascades/Qt4 `.bar` shell so the stock BB10 `WebView` talks to modern HTTPS servers without SSL handshake errors or certificate popups.
 - **Stateless Range media relay**: Proxies signed CDN audio streams (`MP3` / `AAC` / `FLAC`) with HTTP `206` byte-range seeking and automatic upstream URL refresh on expiry—never writing copyrighted audio files to disk.
 - **Upgrade on the NAS only**: The player UI (`web/player.html`, zero-build strict ES5) and API/catalog fixes (such as hydrating >1,000 liked tracks) live on the gateway server, so most updates require no `.bar` reinstall.
-- **Scale-to-zero on NAS**: Optional `Traefik + Sablier` overlay stops the gateway container after idle timeout so NAS drives can sleep, then wakes it on demand in ~1 second.
+- **Always-on single container with native TLS**: Rust/Tokio uses ~0% idle CPU and natively terminates HTTPS (`:16380`, `rustls` + internal Root CA) alongside trusted LAN HTTP (`:16381`)—zero Traefik or Sablier sidecars.
 
 ## How it works
 
@@ -26,10 +26,7 @@ BlackBerry 10 (OS 10.3.3) has no working official music client, lacks modern TLS
  [Optional] VPS L4 Relay (TLS_GUARD=1) ──Tailscale──┐
       │                                                 │
       ▼                                                 ▼
- Traefik (:16380 HTTPS / :16381 HTTP) + Sablier ──► NAS Docker
-      │
-      ▼
- bb10-music163-gateway (Rust / Axum)
+ bb10-music163-gateway (Single Container: :16380 HTTPS / :16381 HTTP)
    ├── netease-adapter ──► [Optional] socks5h:// Proxy ──► NetEase API (Auth / Catalog / URLs)
    ├── media-relay     ──► Direct CDN Fetch ──► Range / 206 Audio Stream
    └── playback-session ── Single-owner monotonic generation + STOP ACK
@@ -44,7 +41,7 @@ BlackBerry 10 (OS 10.3.3) has no working official music client, lacks modern TLS
 | **Playback Arbitration** (`crates/playback-session`) | Single-owner monotonic `generation` state machine across desktop Safari/Chrome and BB10, `STOP ACK` exclusivity confirmation, restart floor persistence |
 | **ES5 Web Player** (`web/player.html`) | Zero-build vanilla ES5 UI compatible with BB10 WebKit and modern browsers: full-screen vinyl turntable, quality menu, Daily Recommendations, Heart Mode, Personal FM, Search, 50-per-page Playlist & Queue |
 | **BB10 Native Shell** (`bb10-shell`) | Fullscreen Cascades Qt4 `.bar` app with embedded `LocalTlsBridge`, persistent LAN/Remote gateway URL switcher, custom squircle icon, and `check-bar.py` verification |
-| **NAS Auto-Sleep & Relay** (`docker-compose.nas-autosleep.yml`) | `Traefik v3.3` + `Sablier` scale-to-zero on idle; compatible with `TLS_GUARD=1` L4 VPS relays |
+| **NAS Native TLS & Relay** (`docker-compose.nas-tls.yml`) | Single-container native `rustls` HTTPS (`:16380`) + trusted LAN HTTP (`:16381`) + bounded `SIGTERM` graceful shutdown; compatible with `TLS_GUARD=1` L4 VPS relays |
 
 ## Quick start (step-by-step)
 
@@ -69,22 +66,22 @@ Edit `.env`:
 Then build and start:
 
 ```bash
-# Standalone HTTP mode (simplest for home LAN on port 16380)
+# Standalone HTTP mode (simplest for local dev / home LAN on port 16380)
 docker compose up -d --build
 
-# Or NAS Auto-Sleep + HTTPS mode (Traefik on :16380 HTTPS / :16381 HTTP + Sablier)
-docker compose -f docker-compose.yml -f docker-compose.nas-autosleep.yml up -d --build
+# Or Single-Container NAS Native TLS mode (:16380 HTTPS + :16381 LAN HTTP)
+docker compose -f docker-compose.nas-tls.yml up -d --build
 ```
 
 Verify the server is healthy:
 
 ```bash
-curl -fsS http://127.0.0.1:16380/health   # (or :16381/health in Traefik mode)
+curl -fsS http://127.0.0.1:16380/health   # (or :16381/health + https://127.0.0.1:16380/health in TLS mode)
 ```
 
 ### First-time login in browser (zero install on BB10 / Phone / PC)
 
-1. Open `http://<NAS_IP>:16380/player` (or `:16381/player` with Traefik) in your BlackBerry Passport browser, Safari, or Chrome.
+1. Open `http://<NAS_IP>:16380/player` (or `:16381/player` / `https://<DOMAIN>:16380/player` in TLS mode) in your BlackBerry Passport browser, Safari, or Chrome.
 2. Paste your `GATEWAY_TOKEN` into **Token** and click **连接 (Connect)**.
 3. Click **扫码登录 (QR Login)** and scan the QR code with the official NetEase Cloud Music mobile app.
 4. Once logged in, cookies are persisted atomically on the server (`0600`), so future visits connect automatically without re-scanning.

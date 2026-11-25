@@ -1,4 +1,6 @@
-# NAS Docker Deployment & Auto-Sleep Guide
+# NAS Docker Deployment Guide (Single-Container Native TLS)
+
+English | [简体中文](NAS_DOCKER.zh-CN.md)
 
 ## 1. Prepare Configuration
 
@@ -6,32 +8,45 @@
    ```bash
    cp .env.example .env
    ```
-2. Set `GATEWAY_TOKEN` (`openssl rand -hex 32`), `GATEWAY_API_PROXY` (e.g. `socks5h://host.docker.internal:1080` or `socks5h://<NAS-LAN-IP>:1080`), and `GATEWAY_HOST_PORT` (defaults to `16380` to avoid colliding with common NAS ports like `8080`/`8090`; verify with `ss -tlnp | grep 16380` on the NAS).
+2. Set `GATEWAY_TOKEN` (`openssl rand -hex 32`), `GATEWAY_API_PROXY` (e.g. `socks5h://host.docker.internal:1080` or `socks5h://<NAS-LAN-IP>:1080`), `GATEWAY_HOST_PORT=16380`, `GATEWAY_LAN_BIND_IP=<NAS-LAN-IP>`, `GATEWAY_LAN_HTTP_PORT=16381`, and `CERTS_DIR` (e.g. `/volume1/docker/bb10-music163/certs`).
 3. Leave `GATEWAY_MEDIA_PROXY=` empty so API/auth requests use your proxy while audio CDN streams directly (split routing).
 
-## 2. Standard Mode (Always-On Low-Power)
+## 2. Single-Container Native TLS Mode (Recommended for NAS + OCI VPS)
 
-The compiled Rust `gateway` binary uses Tokio epoll and consumes ~0% CPU when idle while keeping playlist and session caches warm in memory:
+The compiled Rust `gateway` binary uses Tokio epoll (~0% idle CPU) and natively serves both **HTTPS (`:16380 -> :8443`)** for the OCI VPS `TLS_GUARD=1` relay and **trusted LAN HTTP (`:16381 -> :8090`)** for the BB10 `.bar` LAN shortcut—with **zero** Traefik or Sablier sidecars:
+
+```bash
+docker compose -f docker-compose.nas-tls.yml up -d --build
+```
+
+- **External HTTPS**: `https://<DOMAIN-OR-NAS-IP>:16380/player` (serves `/certs/server.crt` even without SNI; TLS 1.2/1.3 + HTTP/1.1 without requiring ALPN).
+- **Trusted LAN HTTP**: `http://<NAS-LAN-IP>:16381/player` (restrict `:16381` to your trusted LAN / firewall because it carries bearer tokens and media tickets in plaintext).
+- **Health checks**: Container `HEALTHCHECK` probes `http://127.0.0.1:8090/health`; verify external HTTPS separately via `curl --cacert <ca.crt> https://<NAS-IP>:16380/health`.
+- **Certificate permissions & renewal**: `bb10-music163-gateway` runs as non-root `UID 10001`. Ensure `server.crt` and `server.key` (and parent directory traversal) are readable by UID `10001` via a narrow group/ACL (avoid world-readable private keys). Certificates are loaded at startup; restart the container after renewing certs (restarting interrupts active playback).
+- **Graceful shutdown**: On `SIGTERM`/`SIGINT`, the gateway drains both listeners and cancels active streams/long-polls within 4 seconds (exit code `0`), avoiding Docker's 10s `SIGKILL` timeout and Synology "stopped unexpectedly" alerts.
+
+## 3. Standalone HTTP Mode (Local Development / LAN Only)
+
+For local development without certificates:
 
 ```bash
 docker compose up -d --build
 ```
 
-- Access the player UI at `http://<NAS-IP>:16380/player`.
-- Health check endpoint: `http://<NAS-IP>:16380/health`.
+- Player UI: `http://<HOST-IP>:16380/player`
+- Health check: `http://<HOST-IP>:16380/health`
 
-## 3. Auto-Sleep Mode (Scale-to-Zero on Idle)
+## 4. Migrating from Legacy `docker-compose.nas-autosleep.yml` (Traefik + Sablier)
 
-To stop the `bb10-music163-gateway` container completely when no client is connected or playing, use the [docker-compose.nas-autosleep.yml](../docker-compose.nas-autosleep.yml) overlay (Traefik + Sablier):
+The legacy `Traefik + Sablier` overlay (`docker-compose.nas-autosleep.yml`) is deprecated because stopping a ~0% idle Rust container caused cold-start timeouts and DSM unexpected-stop alerts. To migrate while preserving your `gateway_state` volume (login cookies and playback generation):
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.nas-autosleep.yml up -d --build
+# Stop and remove legacy Traefik/Sablier/gateway containers WITHOUT deleting volumes (-v is NOT used!)
+docker compose -f docker-compose.yml -f docker-compose.nas-autosleep.yml down
+# Start the single-container native TLS gateway
+docker compose -f docker-compose.nas-tls.yml up -d
 ```
 
-- **How it works**: Traefik listens on `GATEWAY_HOST_PORT` (default `16380`, HTTPS using `${CERTS_DIR}/server.crt` and `server.key` so it works seamlessly behind the OCI VPS `TLS_GUARD=1` relay). When all clients close (stopping `/api/v1/playback/events` long-polls) and no HTTP request arrives for `IDLE_SLEEP_DURATION` (default `10m`), Sablier runs `docker stop bb10-music163-gateway`.
-- **On-demand wake**: Opening `/player` or launching the BB10 `.bar` app triggers Sablier to start `bb10-music163-gateway` automatically (~1s cold start) and forward the request.
-- **Persistence**: Login cookies (`netease_cookies.json`) and playback generation state live in the `gateway_state` Docker volume (`/data/state`) and survive container stop/start.
-
-## 4. Migrating Existing Login State to NAS
+## 5. Migrating Existing Login State to NAS
 
 To reuse your current NetEase login cookies without scanning QR again, copy `state/netease_cookies.json` into the NAS `gateway_state` volume (with `0600` permissions) after creating the volume.

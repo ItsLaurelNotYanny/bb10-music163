@@ -1,0 +1,51 @@
+# Single-container NAS Native TLS + Dual-Port Compose (replaces Traefik + Sablier).
+# Self-contained for full compatibility with Synology Docker Compose v2.20.x (no merge/!override ambiguity).
+# Usage:
+#   docker compose -f docker-compose.nas-tls.yml up -d
+#
+# Exposes:
+#   - ${GATEWAY_HOST_PORT:-16380} -> container :8443 (HTTPS via rustls + internal Root CA;
+#     compatible with OCI VPS tcp-relay@music163 TLS_GUARD=1 and BB10 .bar remote URL)
+#   - ${GATEWAY_LAN_HTTP_PORT:-16381} -> container :8090 (trusted LAN HTTP for BB10 .bar LAN URL)
+#
+# Only the required certificate and private key files are mounted read-only.
+# Ensure both files are readable by container UID 10001 (and restart after cert renewal).
+
+services:
+  bb10-music163-gateway:
+    image: bb10-music163-gateway:local
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bb10-music163-gateway
+    restart: unless-stopped
+    stop_grace_period: 10s
+    ports:
+      - "${GATEWAY_HOST_PORT:-16380}:8443"
+      - "${GATEWAY_LAN_BIND_IP:?GATEWAY_LAN_BIND_IP must be set to your trusted NAS LAN IP}:${GATEWAY_LAN_HTTP_PORT:-16381}:8090"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      GATEWAY_LISTEN: "${GATEWAY_LISTEN:-0.0.0.0:8090}"
+      GATEWAY_TLS_LISTEN: "${GATEWAY_TLS_LISTEN:-0.0.0.0:8443}"
+      GATEWAY_TLS_CERT: "/certs/server.crt"
+      GATEWAY_TLS_KEY: "/certs/server.key"
+      GATEWAY_TOKEN: "${GATEWAY_TOKEN:?GATEWAY_TOKEN must be set}"
+      GATEWAY_API_PROXY: "${GATEWAY_API_PROXY:-socks5h://host.docker.internal:1080}"
+      # Leave empty for direct CDN audio streaming (split routing).
+      GATEWAY_MEDIA_PROXY: "${GATEWAY_MEDIA_PROXY:-}"
+      GATEWAY_TLS_VERIFY: "${GATEWAY_TLS_VERIFY:-true}"
+      GATEWAY_STATE_DIR: "${GATEWAY_STATE_DIR:-/data/state}"
+    volumes:
+      - gateway_state:/data/state
+      - ${CERTS_DIR:-./certs}/server.crt:/certs/server.crt:ro
+      - ${CERTS_DIR:-./certs}/server.key:/certs/server.key:ro
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8090/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  gateway_state:

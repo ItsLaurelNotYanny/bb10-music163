@@ -20,12 +20,24 @@ pub struct GatewayConfig {
 pub struct ServerConfig {
     pub listen: String,
     pub gateway_token: String,
+    /// Optional native HTTPS listen address (e.g. `0.0.0.0:8443`).
+    #[serde(default)]
+    pub tls_listen: Option<String>,
+    /// PEM certificate chain path for the optional HTTPS listener.
+    #[serde(default)]
+    pub tls_cert: Option<PathBuf>,
+    /// PEM private key path for the optional HTTPS listener.
+    #[serde(default)]
+    pub tls_key: Option<PathBuf>,
 }
 
 impl std::fmt::Debug for ServerConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ServerConfig")
             .field("listen", &self.listen)
+            .field("tls_listen", &self.tls_listen)
+            .field("tls_cert", &self.tls_cert)
+            .field("tls_key", &self.tls_key)
             .field("gateway_token", &"[REDACTED]")
             .finish()
     }
@@ -49,6 +61,9 @@ impl Default for GatewayConfig {
             server: ServerConfig {
                 listen: "127.0.0.1:8090".to_string(),
                 gateway_token: String::new(),
+                tls_listen: None,
+                tls_cert: None,
+                tls_key: None,
             },
             proxy: ProxyConfig {
                 api_proxy: Some("socks5h://127.0.0.1:1080".to_string()),
@@ -80,6 +95,30 @@ impl GatewayConfig {
                 cfg.server.listen = v;
             }
         }
+        if let Ok(v) = env::var("GATEWAY_TLS_LISTEN") {
+            let trimmed = v.trim();
+            cfg.server.tls_listen = if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            };
+        }
+        if let Ok(v) = env::var("GATEWAY_TLS_CERT") {
+            let trimmed = v.trim();
+            cfg.server.tls_cert = if trimmed.is_empty() {
+                None
+            } else {
+                Some(PathBuf::from(trimmed))
+            };
+        }
+        if let Ok(v) = env::var("GATEWAY_TLS_KEY") {
+            let trimmed = v.trim();
+            cfg.server.tls_key = if trimmed.is_empty() {
+                None
+            } else {
+                Some(PathBuf::from(trimmed))
+            };
+        }
         if let Ok(v) = env::var("GATEWAY_TOKEN") {
             if !v.is_empty() {
                 cfg.server.gateway_token = v;
@@ -108,13 +147,48 @@ impl GatewayConfig {
         Ok(cfg)
     }
 
-    /// Validate that HTTP server authentication is configured with a non-placeholder token.
+    /// Validate that HTTP/HTTPS server authentication and optional TLS paths are configured.
     pub fn validate_for_server(&self) -> Result<()> {
         let token = self.server.gateway_token.trim();
         if token.is_empty() || token == "replace-with-strong-gateway-token" {
             bail!(
                 "gateway_token must be set to a non-empty secret (and not the example placeholder) before starting HTTP server"
             );
+        }
+        if let Some(ref tls_listen) = self.server.tls_listen {
+            let tls_addr = tls_listen.trim();
+            if tls_addr.is_empty() {
+                bail!("tls_listen must not be blank when set");
+            }
+            if tls_addr == self.server.listen.trim() {
+                bail!("tls_listen ({tls_addr}) must not match HTTP listen address");
+            }
+            let cert = self
+                .server
+                .tls_cert
+                .as_ref()
+                .filter(|p| !p.as_os_str().is_empty())
+                .ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "GATEWAY_TLS_CERT (server.tls_cert) is required when GATEWAY_TLS_LISTEN is set"
+                    )
+                })?;
+            let key = self
+                .server
+                .tls_key
+                .as_ref()
+                .filter(|p| !p.as_os_str().is_empty())
+                .ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "GATEWAY_TLS_KEY (server.tls_key) is required when GATEWAY_TLS_LISTEN is set"
+                    )
+                })?;
+            if !cert.is_file() {
+                bail!("TLS certificate file not found: {}", cert.display());
+            }
+            if !key.is_file() {
+                bail!("TLS private key file not found: {}", key.display());
+            }
         }
         Ok(())
     }
@@ -183,5 +257,34 @@ state_dir = "/tmp/test-state"
 
         cfg.server.gateway_token = "replace-with-strong-gateway-token".to_string();
         assert!(cfg.validate_for_server().is_err());
+    }
+
+    #[test]
+    fn validates_optional_tls_paths_and_preserves_http_only_mode() {
+        let mut cfg = GatewayConfig::default();
+        cfg.server.gateway_token = "strong-test-token-123".to_string();
+        // HTTP-only mode without TLS settings succeeds
+        assert!(cfg.validate_for_server().is_ok());
+
+        // TLS listen without cert/key fails fast
+        cfg.server.tls_listen = Some("127.0.0.1:8443".to_string());
+        assert!(cfg.validate_for_server().is_err());
+
+        // TLS listen matching HTTP listen fails fast
+        cfg.server.tls_listen = Some(cfg.server.listen.clone());
+        assert!(cfg.validate_for_server().is_err());
+
+        // Non-existent cert/key paths fail fast
+        cfg.server.tls_listen = Some("127.0.0.1:8443".to_string());
+        cfg.server.tls_cert = Some(PathBuf::from("/nonexistent/server.crt"));
+        cfg.server.tls_key = Some(PathBuf::from("/nonexistent/server.key"));
+        assert!(cfg.validate_for_server().is_err());
+
+        // Existing cert/key files pass config validation
+        let cert_file = NamedTempFile::new().unwrap();
+        let key_file = NamedTempFile::new().unwrap();
+        cfg.server.tls_cert = Some(cert_file.path().to_path_buf());
+        cfg.server.tls_key = Some(key_file.path().to_path_buf());
+        assert!(cfg.validate_for_server().is_ok());
     }
 }

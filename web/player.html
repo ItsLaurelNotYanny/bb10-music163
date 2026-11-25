@@ -1410,6 +1410,7 @@
           <option value="extreme">极高</option>
           <option value="lossless">无损</option>
         </select>
+        <button type="button" id="btn-sleep-timer" class="quality-mini" aria-label="Sleep timer" title="Sleep timer (Off / 30m / 60m / 120m)">睡眠:关</button>
       </div>
 
       <div class="mini-row">
@@ -1559,6 +1560,7 @@
       var curArtistSpan = document.getElementById("cur-artist");
       var btnMiniHeart = document.getElementById("btn-mini-heart");
       var btnPlayPause = document.getElementById("btn-play-pause");
+      var btnSleepTimer = document.getElementById("btn-sleep-timer");
       var timeDisplay = document.getElementById("time-display");
       var seekBar = document.getElementById("seek-bar");
       var qualitySelect = document.getElementById("quality-select");
@@ -1618,6 +1620,12 @@
       var cmdSeq = 0;
       var consecutiveAudioErrors = 0;
       var errorSkipTimer = null;
+      var SLEEP_PRESETS_MIN = [0, 30, 60, 120];
+      var UNATTENDED_AUTO_STOP_MS = 3 * 60 * 60 * 1000;
+      var sleepPresetIdx = 0;
+      var sleepDeadlineMs = 0;
+      var sleepTickTimer = null;
+      var lastManualInteractionMs = new Date().getTime();
 
       var loadedPlaylists = [];
       var likedPlaylistId = null;
@@ -2059,7 +2067,68 @@
         }, 20000);
       }
 
+      function markManualInteraction() {
+        lastManualInteractionMs = new Date().getTime();
+      }
+
+      function clearSleepTick() {
+        if (sleepTickTimer) {
+          clearInterval(sleepTickTimer);
+          sleepTickTimer = null;
+        }
+      }
+
+      function updateSleepTimerUi() {
+        if (!btnSleepTimer) return;
+        if (!sleepDeadlineMs) {
+          setText(btnSleepTimer, "睡眠:关");
+          return;
+        }
+        var remMs = sleepDeadlineMs - (new Date().getTime());
+        var remMin = remMs > 0 ? Math.ceil(remMs / 60000) : 0;
+        setText(btnSleepTimer, "睡眠:" + remMin + "m");
+      }
+
+      function checkSleepTimerExpiry() {
+        if (!sleepDeadlineMs) return;
+        if ((new Date().getTime()) >= sleepDeadlineMs) {
+          sleepPresetIdx = 0;
+          sleepDeadlineMs = 0;
+          clearSleepTick();
+          updateSleepTimerUi();
+          log("Sleep timer expired; stopping playback.");
+          player.pause();
+          if (isOwner) {
+            sendPlaybackCommand("stop", null);
+          } else {
+            dropLocalMediaAndReset("STOPPED", currentGen);
+          }
+        } else {
+          updateSleepTimerUi();
+        }
+      }
+
+      function cycleSleepTimer() {
+        markManualInteraction();
+        sleepPresetIdx = (sleepPresetIdx + 1) % SLEEP_PRESETS_MIN.length;
+        var mins = SLEEP_PRESETS_MIN[sleepPresetIdx];
+        clearSleepTick();
+        if (mins <= 0) {
+          sleepDeadlineMs = 0;
+          updateSleepTimerUi();
+          log("Sleep timer disabled.");
+        } else {
+          sleepDeadlineMs = (new Date().getTime()) + (mins * 60 * 1000);
+          updateSleepTimerUi();
+          sleepTickTimer = setInterval(checkSleepTimerExpiry, 15000);
+          log("Sleep timer set to " + mins + "m.");
+        }
+      }
+
       function sendPlaybackCommand(kind, trackObj, extraPositionSecs) {
+        if (kind !== "auto_next" && kind !== "heartbeat" && kind !== "progress") {
+          markManualInteraction();
+        }
         var payload = {
           client_id: clientIdInput.value,
           kind: kind,
@@ -2855,6 +2924,7 @@
       };
 
       function togglePlayPause() {
+        markManualInteraction();
         if (!isOwner || !player.src || player.src === "" || player.src === window.location.href) {
           if (queue.length > 0) {
             playQueueIndex(queueIndex >= 0 ? queueIndex : 0, false);
@@ -2866,8 +2936,13 @@
           return;
         }
         if (player.paused) {
+          // Resume remains server-confirmed to uphold M4 single-owner exclusivity.
           sendPlaybackCommand("resume", null);
         } else {
+          // Pause immediately locally (0ms, unaffected by HTTP/1.1 queueing), then sync server.
+          player.pause();
+          updateOwnershipUi(true, currentGen, "PAUSED", "OWNER");
+          updatePlayButtonVisual(false);
           sendPlaybackCommand("pause", null);
         }
       }
@@ -2903,6 +2978,7 @@
 
       btnPlayPause.onclick = togglePlayPause;
       if (btnNpPlayPause) btnNpPlayPause.onclick = togglePlayPause;
+      if (btnSleepTimer) btnSleepTimer.onclick = cycleSleepTimer;
 
       document.getElementById("btn-stop").onclick = function () {
         if (isOwner) {
@@ -3065,6 +3141,12 @@
 
       player.addEventListener("ended", function () {
         if (chkAutoNext.checked && isOwner && queue.length > 0) {
+          if ((new Date().getTime() - lastManualInteractionMs) >= UNATTENDED_AUTO_STOP_MS) {
+            log("Unattended playback limit reached (3h); stopping automatically.");
+            player.pause();
+            sendPlaybackCommand("stop", null);
+            return;
+          }
           var next = (queueIndex + 1) % queue.length;
           log("Track ended; requesting Auto-Next for gen=" + currentGen);
           playQueueIndex(next, true);

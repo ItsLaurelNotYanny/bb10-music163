@@ -77,6 +77,28 @@ class PlayerPageES5ComplianceTests(unittest.TestCase):
         ]:
             self.assertIn(fragment, self.html_content)
 
+    def test_local_pause_and_sleep_timer_safeguards_present(self):
+        """Verify local-immediate pause, server-confirmed resume, sleep timer, and 3h auto-stop."""
+        for fragment in [
+            'id="btn-sleep-timer"',
+            "UNATTENDED_AUTO_STOP_MS",
+            "markManualInteraction",
+            "cycleSleepTimer",
+            "checkSleepTimerExpiry",
+        ]:
+            self.assertIn(fragment, self.html_content)
+        # Ensure togglePlayPause pauses locally before dispatching server sync
+        m = re.search(
+            r"function togglePlayPause\(\)\s*\{.*?\n      \}",
+            self.script_code,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(m, "togglePlayPause function not found")
+        body = m.group(0)
+        self.assertIn("player.pause();", body)
+        self.assertLess(body.index("player.pause();"), body.index('sendPlaybackCommand("pause", null);'))
+        self.assertNotIn("player.play();", body)
+
 
 if __name__ == "__main__":
     unittest.main()

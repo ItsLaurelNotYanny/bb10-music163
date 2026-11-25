@@ -33,10 +33,12 @@ use std::collections::hash_map::RandomState;
 use std::collections::{HashMap, HashSet};
 use std::hash::{BuildHasher, Hasher};
 use std::path::PathBuf;
+use std::pin::Pin;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex as StdMutex};
+use std::task::{Context as TaskContext, Poll};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use tokio::sync::{Mutex, Notify};
+use tokio::sync::{watch, Mutex, Notify};
 
 const PLAYER_HTML: &str = include_str!("../../../web/player.html");
 const DEFAULT_TICKET_TTL_SECS: u64 = 900;
@@ -44,6 +46,7 @@ const PLAYLIST_CACHE_TTL_SECS: u64 = 600;
 const MAX_EVENT_WAIT_MS: u64 = 15_000;
 
 static TICKET_SEQ: AtomicU64 = AtomicU64::new(1);
+static STREAM_SEQ: AtomicU64 = AtomicU64::new(1);
 
 /// Short-lived generation-bound media access ticket.
 #[derive(Debug, Clone)]
@@ -56,6 +59,54 @@ pub struct MediaTicket {
     pub format_hint: Option<String>,
 }
 
+#[derive(Default)]
+pub struct StreamRegistry {
+    shutting_down: bool,
+    streams: Vec<(u64, u64, RelayCancellationToken)>,
+}
+
+type ActiveStreamRegistry = Arc<StdMutex<StreamRegistry>>;
+
+/// Stream wrapper that removes its entry from `active_streams` synchronously on EOF or drop.
+struct TrackedMediaStream<S> {
+    inner: S,
+    stream_id: u64,
+    active_streams: ActiveStreamRegistry,
+    removed: bool,
+}
+
+impl<S> TrackedMediaStream<S> {
+    fn remove_entry(&mut self) {
+        if !self.removed {
+            self.removed = true;
+            if let Ok(mut reg) = self.active_streams.lock() {
+                reg.streams.retain(|(id, _, _)| *id != self.stream_id);
+            }
+        }
+    }
+}
+
+impl<S> futures_lite::Stream for TrackedMediaStream<S>
+where
+    S: futures_lite::Stream<Item = Result<bytes::Bytes, RelayError>> + Unpin,
+{
+    type Item = Result<bytes::Bytes, RelayError>;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut TaskContext<'_>) -> Poll<Option<Self::Item>> {
+        let res = Pin::new(&mut self.inner).poll_next(cx);
+        if matches!(res, Poll::Ready(None)) {
+            self.remove_entry();
+        }
+        res
+    }
+}
+
+impl<S> Drop for TrackedMediaStream<S> {
+    fn drop(&mut self) {
+        self.remove_entry();
+    }
+}
+
 /// Shared application state for gateway HTTP endpoints.
 #[derive(Clone)]
 pub struct AppState {
@@ -65,8 +116,10 @@ pub struct AppState {
     pub qr_sessions: Arc<Mutex<HashMap<String, QrSession>>>,
     pub playback: Arc<Mutex<PlaybackSession>>,
     pub tickets: Arc<Mutex<HashMap<String, MediaTicket>>>,
-    pub active_streams: Arc<Mutex<Vec<(u64, RelayCancellationToken)>>>,
+    pub active_streams: ActiveStreamRegistry,
     pub events_notify: Arc<Notify>,
+    pub shutdown_tx: Arc<watch::Sender<bool>>,
+    _shutdown_rx: Arc<watch::Receiver<bool>>,
     pub generation_store: GenerationStore,
     pub playlist_cache: Arc<Mutex<HashMap<u64, (u64, PlaylistDetailSummary)>>>,
     pub liked_playlist_id: Arc<Mutex<Option<u64>>>,
@@ -83,6 +136,7 @@ impl AppState {
         let generation_store = GenerationStore::new(&state_dir);
         let prev_gen = generation_store.load();
         let playback = PlaybackSession::from_restart(prev_gen, now_epoch_secs());
+        let (shutdown_tx, shutdown_rx) = watch::channel(false);
 
         Self {
             backend,
@@ -91,12 +145,46 @@ impl AppState {
             qr_sessions: Arc::new(Mutex::new(HashMap::new())),
             playback: Arc::new(Mutex::new(playback)),
             tickets: Arc::new(Mutex::new(HashMap::new())),
-            active_streams: Arc::new(Mutex::new(Vec::new())),
+            active_streams: Arc::new(StdMutex::new(StreamRegistry::default())),
             events_notify: Arc::new(Notify::new()),
+            shutdown_tx: Arc::new(shutdown_tx),
+            _shutdown_rx: Arc::new(shutdown_rx),
             generation_store,
             playlist_cache: Arc::new(Mutex::new(HashMap::new())),
             liked_playlist_id: Arc::new(Mutex::new(None)),
         }
+    }
+
+    /// Return true once process shutdown has been initiated.
+    pub fn is_shutting_down(&self) -> bool {
+        *self.shutdown_tx.borrow()
+    }
+
+    /// Subscribe to persistent shutdown notifications.
+    pub fn shutdown_rx(&self) -> watch::Receiver<bool> {
+        self.shutdown_tx.subscribe()
+    }
+
+    /// Persist shutdown state, wake long-polls, and cancel all registered media streams.
+    pub fn begin_shutdown(&self) {
+        if let Ok(mut reg) = self.active_streams.lock() {
+            reg.shutting_down = true;
+            for (_, _, tok) in reg.streams.iter() {
+                tok.cancel();
+            }
+            reg.streams.clear();
+        }
+        let _ = self.shutdown_tx.send_replace(true);
+        self.events_notify.notify_waiters();
+    }
+
+    /// Current number of active registered media streams (for tests).
+    #[cfg(test)]
+    pub fn active_stream_count(&self) -> usize {
+        self.active_streams
+            .lock()
+            .map(|g| g.streams.len())
+            .unwrap_or(0)
     }
 }
 
@@ -1039,41 +1127,103 @@ async fn relay_stream_response(
         req = req.with_if_range(if_range);
     }
 
+    if state.is_shutting_down() {
+        return Err((
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(ErrorBody {
+                error: "shutting_down",
+                message: "gateway is shutting down".to_string(),
+            }),
+        ));
+    }
+
     let backend_clone = Arc::clone(&state.backend);
     let tickets_clone = Arc::clone(&state.tickets);
     let ticket_owned = ticket_key.map(ToString::to_string);
+    let mut shutdown_rx = state.shutdown_rx();
 
-    let stream_res = state
-        .media_relay
-        .open_with_refresh(req, || async move {
-            let refreshed = backend_clone
-                .resolve_track(song_id, quality)
-                .await
-                .map_err(|e| RelayError::Transport(format!("url refresh failed: {e}")))?;
-            let fresh_url = match refreshed {
-                PlaybackResolution::RelayableMedia(src) => src.url,
-                other => {
-                    return Err(RelayError::PolicyViolation(format!(
-                        "refreshed track returned non-relayable mode: {other:?}"
-                    )));
-                }
-            };
-            if let Some(ref t) = ticket_owned {
-                let mut guard = tickets_clone.lock().await;
-                if let Some(entry) = guard.get_mut(t) {
-                    entry.cached_url = fresh_url.clone();
+    let open_fut = state.media_relay.open_with_refresh(req, || async move {
+        let refreshed = backend_clone
+            .resolve_track(song_id, quality)
+            .await
+            .map_err(|e| RelayError::Transport(format!("url refresh failed: {e}")))?;
+        let fresh_url = match refreshed {
+            PlaybackResolution::RelayableMedia(src) => src.url,
+            other => {
+                return Err(RelayError::PolicyViolation(format!(
+                    "refreshed track returned non-relayable mode: {other:?}"
+                )));
+            }
+        };
+        if let Some(ref t) = ticket_owned {
+            let mut guard = tickets_clone.lock().await;
+            if let Some(entry) = guard.get_mut(t) {
+                entry.cached_url = fresh_url.clone();
+            }
+        }
+        Ok(fresh_url)
+    });
+
+    let stream_res = tokio::select! {
+        res = open_fut => res.map_err(map_relay_error)?,
+        _ = async {
+            while !*shutdown_rx.borrow() {
+                if shutdown_rx.changed().await.is_err() {
+                    std::future::pending::<()>().await;
                 }
             }
-            Ok(fresh_url)
-        })
-        .await
-        .map_err(map_relay_error)?;
+        } => {
+            return Err((
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(ErrorBody {
+                    error: "shutting_down",
+                    message: "gateway is shutting down".to_string(),
+                }),
+            ));
+        }
+    };
 
-    {
-        let mut active = state.active_streams.lock().await;
-        active.retain(|(_, tok)| !tok.is_cancelled());
-        active.push((generation, stream_res.cancel_token.clone()));
-    }
+    // Atomic admission gate: re-verify shutdown state and generation ownership while holding
+    // `playback` -> `active_streams` (matching `post_playback_command` lock ordering) so a
+    // request stalled in upstream header setup cannot start after a stop or takeover.
+    let stream_id = {
+        let pb = state.playback.lock().await;
+        if ticket_key.is_some() && (pb.generation() > 0 || pb.owner().is_some()) {
+            if let Err(err) = pb.validate_media_generation(generation) {
+                stream_res.cancel_token.cancel();
+                return Err((
+                    StatusCode::FORBIDDEN,
+                    Json(ErrorBody {
+                        error: "revoked_generation",
+                        message: err.to_string(),
+                    }),
+                ));
+            }
+        }
+        let mut reg = state
+            .active_streams
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        if reg.shutting_down || state.is_shutting_down() {
+            stream_res.cancel_token.cancel();
+            return Err((
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(ErrorBody {
+                    error: "shutting_down",
+                    message: "gateway is shutting down".to_string(),
+                }),
+            ));
+        }
+        if relay_method == RelayMethod::Head {
+            None
+        } else {
+            let sid = STREAM_SEQ.fetch_add(1, Ordering::Relaxed);
+            reg.streams.retain(|(_, _, tok)| !tok.is_cancelled());
+            reg.streams
+                .push((sid, generation, stream_res.cancel_token.clone()));
+            Some(sid)
+        }
+    };
 
     let mut response_builder = Response::builder().status(stream_res.meta.status);
     let override_ct = match format_hint {
@@ -1092,10 +1242,17 @@ async fn relay_stream_response(
         response_builder = response_builder.header(header::CONTENT_TYPE, ct);
     }
 
-    let body = if relay_method == RelayMethod::Head {
-        Body::empty()
-    } else {
-        Body::from_stream(stream_res.body)
+    let body = match stream_id {
+        None => {
+            stream_res.cancel_token.cancel();
+            Body::empty()
+        }
+        Some(sid) => Body::from_stream(TrackedMediaStream {
+            inner: stream_res.body,
+            stream_id: sid,
+            active_streams: Arc::clone(&state.active_streams),
+            removed: false,
+        }),
     };
 
     response_builder.body(body).map_err(|e| {
@@ -1221,14 +1378,14 @@ async fn post_playback_command(
             outcome.generation.saturating_sub(1)
         };
 
-        {
-            let mut active = state.active_streams.lock().await;
-            for (g, tok) in active.iter() {
+        if let Ok(mut reg) = state.active_streams.lock() {
+            for (_, g, tok) in reg.streams.iter() {
                 if *g <= cutoff {
                     tok.cancel();
                 }
             }
-            active.retain(|(g, tok)| *g > cutoff && !tok.is_cancelled());
+            reg.streams
+                .retain(|(_, g, tok)| *g > cutoff && !tok.is_cancelled());
         }
         {
             let now = now_epoch_secs();
@@ -1367,12 +1524,13 @@ async fn get_playback_events(
         None
     };
 
+    let mut shutdown_rx = state.shutdown_rx();
     let notified = {
         let pb = state.playback.lock().await;
         if let Some(ev) = check_snapshot(&pb) {
             return Ok(Json(ev));
         }
-        if wait_ms == 0 {
+        if wait_ms == 0 || state.is_shutting_down() {
             let snap = pb.snapshot();
             return Ok(Json(PlaybackEventResponse {
                 stop_required: false,
@@ -1388,6 +1546,13 @@ async fn get_playback_events(
     tokio::select! {
         _ = notified => {}
         _ = tokio::time::sleep(Duration::from_millis(wait_ms)) => {}
+        _ = async {
+            while !*shutdown_rx.borrow() {
+                if shutdown_rx.changed().await.is_err() {
+                    std::future::pending::<()>().await;
+                }
+            }
+        } => {}
     }
 
     let pb = state.playback.lock().await;
@@ -1517,12 +1682,12 @@ mod tests {
     use tokio::net::TcpListener;
     use tower::ServiceExt;
 
-    struct MockBackend {
-        fixture_port: u16,
-        resolve_calls: AtomicUsize,
-        api_calls: AtomicU64,
-        favorites_base_count: usize,
-        extra_liked_ids: Vec<u64>,
+    pub(super) struct MockBackend {
+        pub(super) fixture_port: u16,
+        pub(super) resolve_calls: AtomicUsize,
+        pub(super) api_calls: AtomicU64,
+        pub(super) favorites_base_count: usize,
+        pub(super) extra_liked_ids: Vec<u64>,
     }
 
     impl MockBackend {
@@ -2357,4 +2522,460 @@ mod tests {
         let reg_json: PlaylistDetailSummary = serde_json::from_slice(&reg_bytes).unwrap();
         assert_eq!(reg_json.songs.len(), 1000);
     }
+
+    #[tokio::test]
+    async fn active_streams_cleanup_on_eof_head_and_admission_race() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        use tokio::net::TcpListener;
+        use tokio::sync::Notify as TokioNotify;
+
+        let dir = TempDir::new().unwrap();
+        let upstream_listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let fixture_port = upstream_listener.local_addr().unwrap().port();
+        let release_slow = Arc::new(TokioNotify::new());
+        let slow_entered = Arc::new(TokioNotify::new());
+        let release_slow_srv = Arc::clone(&release_slow);
+        let slow_entered_srv = Arc::clone(&slow_entered);
+
+        let fixture_task = tokio::spawn(async move {
+            loop {
+                let Ok((mut sock, _)) = upstream_listener.accept().await else {
+                    break;
+                };
+                let rel = Arc::clone(&release_slow_srv);
+                let ent = Arc::clone(&slow_entered_srv);
+                tokio::spawn(async move {
+                    let mut buf = [0u8; 2048];
+                    let n = sock.read(&mut buf).await.unwrap_or(0);
+                    let req = String::from_utf8_lossy(&buf[..n]);
+                    let first = req.lines().next().unwrap_or("");
+                    if first.contains("/slow") {
+                        ent.notify_waiters();
+                        rel.notified().await;
+                    }
+                    let is_head = first.starts_with("HEAD ");
+                    let payload = b"0123456789abcdef";
+                    let header = format!(
+                        "HTTP/1.1 200 OK\r\nContent-Type: audio/mpeg\r\nAccept-Ranges: bytes\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                        payload.len()
+                    );
+                    let _ = sock.write_all(header.as_bytes()).await;
+                    if !is_head {
+                        let _ = sock.write_all(payload).await;
+                    }
+                });
+            }
+        });
+
+        let backend: Arc<dyn MusicBackend> = Arc::new(MockBackend {
+            fixture_port,
+            resolve_calls: AtomicUsize::new(0),
+            api_calls: AtomicU64::new(0),
+            favorites_base_count: 10,
+            extra_liked_ids: Vec::new(),
+        });
+        let relay = Arc::new(
+            MediaRelay::new(
+                RelayConfig::default(),
+                DestinationPolicy::local_fixture_for_test(vec!["127.0.0.1".into()]),
+            )
+            .unwrap(),
+        );
+        let state = AppState::new(
+            backend,
+            relay,
+            "test-gateway-token".to_string(),
+            dir.path().to_path_buf(),
+        );
+        let app = build_router(state.clone());
+
+        // 1. Repeated GET and HEAD streams must leave active_streams empty after completion.
+        let fast_url = format!("http://127.0.0.1:{fixture_port}/fast");
+        {
+            let mut tickets = state.tickets.lock().await;
+            tickets.insert(
+                "t-fast".to_string(),
+                MediaTicket {
+                    song_id: 1908049566,
+                    quality: AudioQuality::Standard,
+                    generation: 0,
+                    expires_at_epoch_secs: now_epoch_secs() + 600,
+                    cached_url: fast_url,
+                    format_hint: Some("mp3".to_string()),
+                },
+            );
+        }
+        for _ in 0..3 {
+            let head_res = app
+                .clone()
+                .oneshot(
+                    HttpRequest::builder()
+                        .method(Method::HEAD)
+                        .uri("/api/v1/media/t-fast")
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(head_res.status(), StatusCode::OK);
+            assert_eq!(state.active_stream_count(), 0);
+
+            let get_res = app
+                .clone()
+                .oneshot(
+                    HttpRequest::builder()
+                        .method(Method::GET)
+                        .uri("/api/v1/media/t-fast")
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(get_res.status(), StatusCode::OK);
+            let bytes = get_res.into_body().collect().await.unwrap().to_bytes();
+            assert_eq!(bytes.as_ref(), b"0123456789abcdef");
+            assert_eq!(state.active_stream_count(), 0);
+        }
+
+        // 2. Admission race: explicit_play creates gen=1, a slow media request passes initial
+        // ticket check and stalls waiting for upstream headers, then stop revokes gen=1 before
+        // headers arrive -> stalled request must be rejected with 403 and never register.
+        let play_res = app
+            .clone()
+            .oneshot(
+                HttpRequest::builder()
+                    .method(Method::POST)
+                    .uri("/api/v1/playback/command")
+                    .header(header::AUTHORIZATION, "Bearer test-gateway-token")
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Body::from(
+                        r#"{"client_id":"desk-1","kind":"explicit_play","expected_generation":0,"idempotency_key":"race-play","track":{"provider":"netease","track_id":"1908049566"}}"#,
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(play_res.status(), StatusCode::OK);
+
+        let slow_url = format!("http://127.0.0.1:{fixture_port}/slow");
+        {
+            let mut tickets = state.tickets.lock().await;
+            tickets.insert(
+                "t-slow".to_string(),
+                MediaTicket {
+                    song_id: 1908049566,
+                    quality: AudioQuality::Standard,
+                    generation: 1,
+                    expires_at_epoch_secs: now_epoch_secs() + 600,
+                    cached_url: slow_url.clone(),
+                    format_hint: Some("mp3".to_string()),
+                },
+            );
+        }
+
+        let app_for_slow = app.clone();
+        let slow_fut = tokio::spawn(async move {
+            app_for_slow
+                .oneshot(
+                    HttpRequest::builder()
+                        .method(Method::GET)
+                        .uri("/api/v1/media/t-slow")
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap()
+        });
+
+        slow_entered.notified().await;
+
+        // Revoke generation 1 via stop while upstream headers are still stalled.
+        let stop_res = app
+            .clone()
+            .oneshot(
+                HttpRequest::builder()
+                    .method(Method::POST)
+                    .uri("/api/v1/playback/command")
+                    .header(header::AUTHORIZATION, "Bearer test-gateway-token")
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Body::from(
+                        r#"{"client_id":"desk-1","kind":"stop","expected_generation":1,"idempotency_key":"race-stop"}"#,
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(stop_res.status(), StatusCode::OK);
+
+        release_slow.notify_waiters();
+        let slow_res = slow_fut.await.unwrap();
+        assert_eq!(slow_res.status(), StatusCode::FORBIDDEN);
+        assert_eq!(state.active_stream_count(), 0);
+
+        // 3. Stalled media setup aborts immediately with 503 when shutdown begins.
+        let play2_res = app
+            .clone()
+            .oneshot(
+                HttpRequest::builder()
+                    .method(Method::POST)
+                    .uri("/api/v1/playback/command")
+                    .header(header::AUTHORIZATION, "Bearer test-gateway-token")
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Body::from(
+                        r#"{"client_id":"desk-2","kind":"explicit_play","expected_generation":1,"idempotency_key":"race-play-2","track":{"provider":"netease","track_id":"1908049566"}}"#,
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(play2_res.status(), StatusCode::OK);
+        {
+            let mut tickets = state.tickets.lock().await;
+            tickets.insert(
+                "t-slow-shutdown".to_string(),
+                MediaTicket {
+                    song_id: 1908049566,
+                    quality: AudioQuality::Standard,
+                    generation: 2,
+                    expires_at_epoch_secs: now_epoch_secs() + 600,
+                    cached_url: slow_url,
+                    format_hint: Some("mp3".to_string()),
+                },
+            );
+        }
+        let app_for_sd = app.clone();
+        let sd_fut = tokio::spawn(async move {
+            app_for_sd
+                .oneshot(
+                    HttpRequest::builder()
+                        .method(Method::GET)
+                        .uri("/api/v1/media/t-slow-shutdown")
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap()
+        });
+        slow_entered.notified().await;
+        state.begin_shutdown();
+        let sd_res = tokio::time::timeout(Duration::from_secs(2), sd_fut)
+            .await
+            .expect("stalled media setup did not abort on shutdown")
+            .unwrap();
+        assert_eq!(sd_res.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(state.active_stream_count(), 0);
+
+        fixture_task.abort();
+    }
+
+    #[tokio::test]
+    async fn shutdown_with_zero_subscribers_persists_and_blocks_media_without_upstream() {
+        use tokio::net::TcpListener;
+
+        let dir = TempDir::new().unwrap();
+        let upstream_listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let fixture_port = upstream_listener.local_addr().unwrap().port();
+        let accepted = Arc::new(AtomicUsize::new(0));
+        let accepted_srv = Arc::clone(&accepted);
+        let fixture_task = tokio::spawn(async move {
+            loop {
+                let Ok((_sock, _)) = upstream_listener.accept().await else {
+                    break;
+                };
+                accepted_srv.fetch_add(1, Ordering::SeqCst);
+            }
+        });
+
+        let backend: Arc<dyn MusicBackend> = Arc::new(MockBackend {
+            fixture_port,
+            resolve_calls: AtomicUsize::new(0),
+            api_calls: AtomicU64::new(0),
+            favorites_base_count: 10,
+            extra_liked_ids: Vec::new(),
+        });
+        let relay = Arc::new(
+            MediaRelay::new(
+                RelayConfig::default(),
+                DestinationPolicy::local_fixture_for_test(vec!["127.0.0.1".into()]),
+            )
+            .unwrap(),
+        );
+        let state = AppState::new(
+            backend,
+            relay,
+            "test-gateway-token".to_string(),
+            dir.path().to_path_buf(),
+        );
+        {
+            let mut tickets = state.tickets.lock().await;
+            tickets.insert(
+                "t-after-shutdown".to_string(),
+                MediaTicket {
+                    song_id: 1908049566,
+                    quality: AudioQuality::Standard,
+                    generation: 0,
+                    expires_at_epoch_secs: now_epoch_secs() + 600,
+                    cached_url: format!("http://127.0.0.1:{fixture_port}/never"),
+                    format_hint: Some("mp3".to_string()),
+                },
+            );
+        }
+
+        // Trigger shutdown while ZERO requests are subscribed.
+        state.begin_shutdown();
+        assert!(state.is_shutting_down());
+        assert!(*state.shutdown_rx().borrow());
+
+        let app = build_router(state.clone());
+
+        // 1. A 15s event long-poll arriving AFTER zero-subscriber shutdown must return promptly.
+        let started = std::time::Instant::now();
+        let poll_res = app
+            .clone()
+            .oneshot(
+                HttpRequest::builder()
+                    .uri("/api/v1/playback/events?client_id=late-client&known_generation=0&wait_ms=15000")
+                    .header(header::AUTHORIZATION, "Bearer test-gateway-token")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(poll_res.status(), StatusCode::OK);
+        assert!(
+            started.elapsed() < Duration::from_millis(500),
+            "long-poll did not return promptly after shutdown: {:?}",
+            started.elapsed()
+        );
+
+        // 2. A media request arriving AFTER zero-subscriber shutdown must return 503
+        //    WITHOUT opening any upstream connection.
+        let media_res = app
+            .oneshot(
+                HttpRequest::builder()
+                    .uri("/api/v1/media/t-after-shutdown")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(media_res.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(accepted.load(Ordering::SeqCst), 0);
+        assert_eq!(state.active_stream_count(), 0);
+
+        fixture_task.abort();
+    }
+
+    #[tokio::test]
+    async fn media_admission_racing_shutdown_leaves_no_surviving_streams() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        use tokio::net::TcpListener;
+
+        let dir = TempDir::new().unwrap();
+        let upstream_listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let fixture_port = upstream_listener.local_addr().unwrap().port();
+        let fixture_task = tokio::spawn(async move {
+            loop {
+                let Ok((mut sock, _)) = upstream_listener.accept().await else {
+                    break;
+                };
+                tokio::spawn(async move {
+                    let mut buf = [0u8; 1024];
+                    let _ = sock.read(&mut buf).await;
+                    let header = "HTTP/1.1 200 OK\r\nContent-Type: audio/mpeg\r\nContent-Length: 4096\r\nConnection: close\r\n\r\n";
+                    let _ = sock.write_all(header.as_bytes()).await;
+                    let _ = sock.write_all(&[0u8; 64]).await;
+                    tokio::time::sleep(Duration::from_secs(5)).await;
+                });
+            }
+        });
+
+        let backend: Arc<dyn MusicBackend> = Arc::new(MockBackend {
+            fixture_port,
+            resolve_calls: AtomicUsize::new(0),
+            api_calls: AtomicU64::new(0),
+            favorites_base_count: 10,
+            extra_liked_ids: Vec::new(),
+        });
+        let relay = Arc::new(
+            MediaRelay::new(
+                RelayConfig::default(),
+                DestinationPolicy::local_fixture_for_test(vec!["127.0.0.1".into()]),
+            )
+            .unwrap(),
+        );
+        let state = AppState::new(
+            backend,
+            relay,
+            "test-gateway-token".to_string(),
+            dir.path().to_path_buf(),
+        );
+        {
+            let mut tickets = state.tickets.lock().await;
+            tickets.insert(
+                "t-race".to_string(),
+                MediaTicket {
+                    song_id: 1908049566,
+                    quality: AudioQuality::Standard,
+                    generation: 0,
+                    expires_at_epoch_secs: now_epoch_secs() + 600,
+                    cached_url: format!("http://127.0.0.1:{fixture_port}/stream"),
+                    format_hint: Some("mp3".to_string()),
+                },
+            );
+        }
+        let app = build_router(state.clone());
+
+        let mut handles = Vec::new();
+        for _ in 0..8 {
+            let a = app.clone();
+            handles.push(tokio::spawn(async move {
+                a.oneshot(
+                    HttpRequest::builder()
+                        .uri("/api/v1/media/t-race")
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap()
+            }));
+        }
+        tokio::task::yield_now().await;
+        state.begin_shutdown();
+
+        for h in handles {
+            let resp = h.await.unwrap();
+            assert!(
+                resp.status() == StatusCode::SERVICE_UNAVAILABLE
+                    || resp.status() == StatusCode::OK,
+                "unexpected status: {}",
+                resp.status()
+            );
+            // Any stream admitted just before begin_shutdown must already be cancelled and
+            // cleaned up when its body finishes/drops.
+            drop(resp);
+        }
+        assert_eq!(state.active_stream_count(), 0);
+
+        fixture_task.abort();
+    }
+}
+
+#[cfg(test)]
+pub(crate) fn test_state_for_tls(state_dir: PathBuf) -> AppState {
+    let backend: Arc<dyn MusicBackend> = Arc::new(tests::MockBackend {
+        fixture_port: 0,
+        resolve_calls: std::sync::atomic::AtomicUsize::new(0),
+        api_calls: AtomicU64::new(0),
+        favorites_base_count: 10,
+        extra_liked_ids: Vec::new(),
+    });
+    let relay = Arc::new(
+        MediaRelay::new(
+            media_relay::RelayConfig::default(),
+            media_relay::DestinationPolicy::local_fixture_for_test(vec!["127.0.0.1".into()]),
+        )
+        .unwrap(),
+    );
+    AppState::new(backend, relay, "test-gateway-token".to_string(), state_dir)
 }

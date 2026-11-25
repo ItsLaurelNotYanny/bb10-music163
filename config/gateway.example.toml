@@ -2,8 +2,12 @@
 # Copy to config/gateway.toml (ignored by VCS) and replace placeholders before running.
 
 [server]
-# Local listen socket for gateway REST/UI access.
+# Local HTTP listen socket for gateway REST/UI access.
 listen = "127.0.0.1:8090"
+# Optional native HTTPS listen socket (uncomment together with tls_cert and tls_key):
+# tls_listen = "0.0.0.0:8443"
+# tls_cert = "/certs/server.crt"
+# tls_key = "/certs/server.key"
 # Gateway Bearer token protecting /api/v1/* endpoints (separate from NetEase cookies).
 # Generate a strong random token, e.g.: openssl rand -hex 32
 gateway_token = "replace-with-strong-gateway-token"

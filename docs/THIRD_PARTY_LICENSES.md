@@ -1,5 +1,7 @@
 # Third-Party Licenses and Runtime Choices
 
+English | [简体中文](THIRD_PARTY_LICENSES.zh-CN.md)
+
 This document records the pinned dependencies, async runtime selection, and license boundaries for the Rust workspace.
 
 ## Runtime Choice

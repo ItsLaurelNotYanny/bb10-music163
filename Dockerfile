@@ -30,7 +30,7 @@ WORKDIR /data
 ENV GATEWAY_LISTEN=0.0.0.0:8090
 ENV GATEWAY_STATE_DIR=/data/state
 
-EXPOSE 8090
+EXPOSE 8090 8443
 
 HEALTHCHECK --interval=5s --timeout=3s --start-period=2s --retries=3 \
     CMD curl -fsS http://127.0.0.1:8090/health >/dev/null || exit 1

@@ -6,12 +6,16 @@ services:
       dockerfile: Dockerfile
     container_name: bb10-music163-gateway
     restart: unless-stopped
+    stop_grace_period: 10s
     ports:
       - "${GATEWAY_HOST_PORT:-16380}:8090"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
       GATEWAY_LISTEN: "${GATEWAY_LISTEN:-0.0.0.0:8090}"
+      GATEWAY_TLS_LISTEN: "${GATEWAY_TLS_LISTEN:-}"
+      GATEWAY_TLS_CERT: "${GATEWAY_TLS_CERT:-}"
+      GATEWAY_TLS_KEY: "${GATEWAY_TLS_KEY:-}"
       GATEWAY_TOKEN: "${GATEWAY_TOKEN:?GATEWAY_TOKEN must be set}"
       GATEWAY_API_PROXY: "${GATEWAY_API_PROXY:-socks5h://host.docker.internal:1080}"
       # Leave empty for direct CDN audio streaming (split routing).

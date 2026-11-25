@@ -1,5 +1,7 @@
 # Test Audio Provenance and Specifications
 
+English | [简体中文](PROVENANCE.zh-CN.md)
+
 All audio files in this directory are 100% synthetically generated for M0 feasibility testing. No copyrighted or external commercial recordings are included.
 
 ## Generation Method
